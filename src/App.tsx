@@ -11,7 +11,13 @@ import { SupportView } from './components/SupportView';
 import { AdminPanel } from './components/AdminPanel';
 import { TrialExpiredLockModal } from './components/TrialExpiredLockModal';
 import { AddSongToSetlistModal } from './components/AddSongToSetlistModal';
+import { SelectSetlistForSongModal } from './components/SelectSetlistForSongModal';
+import { MediaRecordingStudio } from './components/MediaRecordingStudio';
+import { VideoPlaybackModal } from './components/VideoPlaybackModal';
 import { SubscriptionView } from './components/SubscriptionView';
+import { ListMusic, Video, Mic, Film, Plus, Check, Search, Music, Sparkles, Loader2 } from 'lucide-react';
+import { musicSearchProvider } from './services/MusicSearchProvider';
+import { findVerifiedFullLyrics } from './data/fullLyricsCatalog';
 import confetti from 'canvas-confetti';
 import {
   getUserSongs,
@@ -24,6 +30,7 @@ import {
   deletePlaylist,
   deleteRecording,
   saveSongToLibrary,
+  saveRecording,
 } from './services/DatabaseService';
 
 export default function App() {
@@ -66,6 +73,11 @@ export default function App() {
 
   // Modals & UI helpers
   const [showAddSongModal, setShowAddSongModal] = useState(false);
+  const [addSongModalTab, setAddSongModalTab] = useState<'manual' | 'catalog'>('manual');
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
+  const [catalogSearchResults, setCatalogSearchResults] = useState<any[]>([]);
+  const [catalogSearching, setCatalogSearching] = useState(false);
+  const [catalogAddedIds, setCatalogAddedIds] = useState<string[]>([]);
   const [newSongTitle, setNewSongTitle] = useState('');
   const [newSongArtist, setNewSongArtist] = useState('');
   const [newSongLyrics, setNewSongLyrics] = useState('');
@@ -77,6 +89,8 @@ export default function App() {
   // Setlist Specific Modals
   const [showShowModePickerModal, setShowShowModePickerModal] = useState(false);
   const [showAddToSetlistModal, setShowAddToSetlistModal] = useState(false);
+  const [songToAddToSetlist, setSongToAddToSetlist] = useState<Song | null>(null);
+  const [activeVideoModal, setActiveVideoModal] = useState<Recording | null>(null);
   const [addToSetlistTab, setAddToSetlistTab] = useState<'global' | 'library' | 'new'>('global');
   const [filterLibrarySearch, setFilterLibrarySearch] = useState('');
 
@@ -761,6 +775,66 @@ export default function App() {
     }
   };
 
+  const handleSearchCatalogForLibrary = async (q: string) => {
+    setCatalogSearchQuery(q);
+    if (!q.trim()) {
+      setCatalogSearchResults([]);
+      return;
+    }
+    setCatalogSearching(true);
+    try {
+      const results = await musicSearchProvider.search(q.trim(), 'Todas');
+      setCatalogSearchResults(results);
+    } catch (err) {
+      console.error('Catalog search error:', err);
+    } finally {
+      setCatalogSearching(false);
+    }
+  };
+
+  const handleAddCatalogSongToLibrary = async (item: any) => {
+    let fullLyrics = item.lyrics;
+    if (!fullLyrics || fullLyrics.length < 50) {
+      const verified = findVerifiedFullLyrics(item.title, item.artist);
+      if (verified?.lyrics) {
+        fullLyrics = verified.lyrics;
+      } else {
+        try {
+          const fetched = await musicSearchProvider.getLyrics(item.title, item.artist);
+          if (fetched && fetched.length > 50) fullLyrics = fetched;
+        } catch {}
+      }
+    }
+
+    const songPayload = {
+      title: item.title,
+      artist: item.artist,
+      lyrics: fullLyrics || 'Letra da música',
+      source: item.source || 'Catálogo Oficial',
+      key_signature: item.key_signature || '',
+      cover_url: item.cover || item.coverUrl,
+    };
+
+    let created: Song;
+    if (user) {
+      created = await saveSongToLibrary(user.uid, songPayload);
+    } else {
+      const now = new Date().toISOString();
+      created = {
+        id: 'song_' + Date.now(),
+        user_id: 'guest',
+        ...songPayload,
+        created_at: now,
+        updated_at: now,
+      };
+    }
+
+    setUserSongs((prev) => [created, ...prev.filter((s) => s.id !== created.id)]);
+    setCatalogAddedIds((prev) => [...prev, item.id]);
+    showToast(`"${created.title}" adicionada separadamente à Minha Biblioteca!`);
+    confetti({ particleCount: 30, spread: 60 });
+  };
+
   const handleCreateSongForActiveSetlist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSongTitle.trim() || !activeSetlist) return;
@@ -860,19 +934,41 @@ export default function App() {
     setPlayingRecordingId(null);
   };
 
-  const downloadRecordingAudio = (recording: Recording) => {
+  const downloadRecordingMedia = (recording: Recording) => {
     try {
       const a = document.createElement('a');
       a.href = recording.file_url;
-      const safeTitle = (recording.song_title || 'gravacao')
+      const isVideo =
+        recording.media_type === 'video' ||
+        (recording.file_url && recording.file_url.startsWith('data:video'));
+      const safeTitle = (recording.song_title || (isVideo ? 'filmagem' : 'gravacao'))
         .toLowerCase()
         .replace(/[^a-z0-9]/g, '_');
-      a.download = `kolvox_${safeTitle}_${Date.now()}.webm`;
+      const ext = isVideo ? 'webm' : 'webm';
+      a.download = `kolvox_${safeTitle}_${Date.now()}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
     } catch (err) {
       console.error('Download failed:', err);
+    }
+  };
+
+  const downloadRecordingAudio = downloadRecordingMedia;
+
+  const handleSaveNewRecording = async (recData: {
+    song_id?: string;
+    song_title: string;
+    song_artist?: string;
+    file_url: string;
+    duration: number;
+    media_type: 'audio' | 'video';
+  }) => {
+    try {
+      const saved = await saveRecording(user?.uid || 'guest', recData);
+      setRecordings((prev) => [saved, ...prev]);
+    } catch (err) {
+      console.error('Error saving recording:', err);
     }
   };
 
@@ -1430,10 +1526,67 @@ export default function App() {
                 </div>
                 <button
                   className="primary-button"
-                  onClick={() => setShowAddSongModal(true)}
+                  onClick={() => {
+                    setAddSongModalTab('manual');
+                    setShowAddSongModal(true);
+                  }}
                 >
                   + Adicionar música
                 </button>
+              </div>
+
+              {/* BARRA DE SETLIST ALVO / ORGANIZAÇÃO */}
+              <div className="bg-[#050f1d]/90 border border-blue-900/40 rounded-2xl p-3.5 px-4 mb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <ListMusic className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center flex-wrap gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                        Setlist Ativo:
+                      </span>
+                      {playlists.length > 0 ? (
+                        <select
+                          value={activeSetlist?.id || ''}
+                          onChange={(e) => setSelectedPlaylistId(e.target.value)}
+                          className="bg-zinc-950 border border-zinc-700 hover:border-amber-400 rounded-lg px-2.5 py-1 text-xs font-bold text-white outline-none cursor-pointer"
+                        >
+                          {playlists.map((pl) => (
+                            <option key={pl.id} value={pl.id}>
+                              {pl.name} ({pl.songs?.length ?? pl.song_count ?? 0} faixas)
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs text-zinc-400 italic">Nenhum setlist criado</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                      Cada música clicada em <strong className="text-amber-300">+ Setlist</strong> é adicionada individualmente ao setlist ativo.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateSetlistModal(true)}
+                    className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-amber-400" />
+                    <span>+ Novo Setlist</span>
+                  </button>
+                  {activeSetlist && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage('setlists')}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>Abrir Setlists ({activeSetlist.songs?.length ?? activeSetlist.song_count ?? 0})</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="library-grid">
@@ -1445,7 +1598,10 @@ export default function App() {
                       Nenhuma música cadastrada ainda. Adicione músicas clicando no botão abaixo ou pesquisando no catálogo.
                     </p>
                     <button
-                      onClick={() => setShowAddSongModal(true)}
+                      onClick={() => {
+                        setAddSongModalTab('manual');
+                        setShowAddSongModal(true);
+                      }}
                       className="primary-button inline-flex items-center gap-2"
                     >
                       + Adicionar música
@@ -1454,6 +1610,9 @@ export default function App() {
                 ) : (
                   allLibrarySongs.map((s) => {
                   const isFav = favorites.includes(s.id);
+                  const isAlreadyInActiveSetlist = Boolean(
+                    activeSetlist?.songs?.some((track) => track.id === s.id)
+                  );
                   return (
                     <div key={s.id} className="library-card">
                       <div className="flex items-center justify-between gap-2 mb-3">
@@ -1480,9 +1639,53 @@ export default function App() {
                       <div className="flex gap-2 mt-auto">
                         <button
                           onClick={() => handleOpenSongInShowMode(s)}
-                          className="hover:border-blue-400"
+                          className="hover:border-blue-400 flex-1"
                         >
                           Abrir no Modo Show
+                        </button>
+
+                        {/* BOTÃO ADICIONAR SEPARADAMENTE À SETLIST */}
+                        {isAlreadyInActiveSetlist ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (activeSetlist) {
+                                handleRemoveSongFromSetlist(activeSetlist.id, s.id);
+                                showToast(`"${s.title}" removida do setlist "${activeSetlist.name}".`);
+                              }
+                            }}
+                            className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                            title={`Música incluída no setlist "${activeSetlist?.name}". Clique para remover se desejar.`}
+                          >
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            <span>✓ No Setlist</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!activeSetlist) {
+                                setSongToAddToSetlist(s);
+                                return;
+                              }
+                              await handleAddSongToSetlist(activeSetlist.id, s);
+                            }}
+                            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-amber-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                            title={activeSetlist ? `Adicionar individualmente ao setlist "${activeSetlist.name}"` : 'Adicionar à Minha Setlist'}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Setlist</span>
+                          </button>
+                        )}
+
+                        {/* ESCOLHER OUTRO SETLIST */}
+                        <button
+                          type="button"
+                          onClick={() => setSongToAddToSetlist(s)}
+                          className="p-2 rounded-xl bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-white text-xs flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                          title="Escolher outro setlist para esta música..."
+                        >
+                          <ListMusic className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -1781,100 +1984,141 @@ export default function App() {
           {/* PÁGINA: MINHAS GRAVAÇÕES (RECORDINGS) */}
           {/* ==================================================== */}
           {currentPage === 'recordings' && (
-            <section className="page recordings-page">
+            <section className="page recordings-page space-y-6">
               <div className="page-title">
                 <div>
-                  <span className="small-label">SUAS PERFORMANCES</span>
+                  <span className="small-label">SUAS PERFORMANCES & GRAVAÇÕES</span>
                   <h1>Minhas Gravações</h1>
                 </div>
-                <button
-                  className="record-button cursor-pointer"
-                  onClick={() => {
-                    if (allLibrarySongs.length > 0) {
-                      handleOpenSongInShowMode(allLibrarySongs[0]);
-                    } else {
-                      setShowAddSongModal(true);
-                    }
-                  }}
-                >
-                  ● GRAVAR NO MODO SHOW
-                </button>
               </div>
 
+              {/* Estúdio de Gravação & Filmagem com Proteção Anti-Estouro */}
+              <MediaRecordingStudio
+                userSongs={allLibrarySongs}
+                userId={user?.uid}
+                onSaveRecording={handleSaveNewRecording}
+                onShowToast={showToast}
+              />
+
               <div className="recordings-list flex flex-col gap-3">
+                <div className="flex items-center justify-between text-xs font-bold text-zinc-400 px-1 pt-2">
+                  <span>HISTÓRICO DE GRAVAÇÕES ({recordings.length})</span>
+                  <span className="text-[11px] text-zinc-500">Áudios & Filmagens de Alta Fidelidade</span>
+                </div>
+
                 {recordings.length > 0 ? (
-                  recordings.map((rec) => (
-                    <div key={rec.id} className="recording-card flex items-center gap-3 p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex-wrap sm:flex-nowrap">
-                      {/* BOTÃO EXCLUIR */}
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteRecording(rec.id)}
-                        title="Excluir gravação"
-                        className="delete-front-btn mr-1 shrink-0"
-                      >
-                        <span>🗑</span>
-                        <span>Excluir</span>
-                      </button>
+                  recordings.map((rec) => {
+                    const isVideo =
+                      rec.media_type === 'video' ||
+                      (rec.file_url && rec.file_url.startsWith('data:video'));
+                    const isPlaying = playingRecordingId === rec.id;
 
-                      {/* BOTÃO INICIAR (PLAY) */}
-                      <button
-                        type="button"
-                        onClick={() => playRecordingAudio(rec)}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
-                          playingRecordingId === rec.id
-                            ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/25 ring-2 ring-emerald-400'
-                            : 'bg-zinc-800 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30'
-                        }`}
-                        title="Iniciar reprodução do áudio gravado"
+                    return (
+                      <div
+                        key={rec.id}
+                        className="recording-card flex items-center gap-3 p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700/80 flex-wrap sm:flex-nowrap shadow-md transition-all"
                       >
-                        <span className="text-sm">▶</span>
-                        <span>Iniciar</span>
-                      </button>
+                        {/* BOTÃO EXCLUIR */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRecording(rec.id)}
+                          title="Excluir gravação"
+                          className="delete-front-btn mr-1 shrink-0 cursor-pointer"
+                        >
+                          <span>🗑</span>
+                          <span>Excluir</span>
+                        </button>
 
-                      {/* BOTÃO PARAR (STOP) */}
-                      <button
-                        type="button"
-                        onClick={stopRecordingAudio}
-                        disabled={playingRecordingId !== rec.id}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 ${
-                          playingRecordingId === rec.id
-                            ? 'bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/30 cursor-pointer'
-                            : 'bg-zinc-850 text-zinc-600 border border-zinc-800 cursor-not-allowed opacity-60'
-                        }`}
-                        title="Parar áudio gravado"
-                      >
-                        <span className="text-xs">⏹</span>
-                        <span>Parar</span>
-                      </button>
+                        {/* PLAY BUTTON FOR VIDEO OR AUDIO */}
+                        {isVideo ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveVideoModal(rec)}
+                            className="px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shrink-0 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-zinc-950 shadow-md shadow-cyan-500/25"
+                            title="Assistir à Filmagem em Vídeo HD"
+                          >
+                            <span className="text-sm">▶</span>
+                            <span>Assistir Filmagem</span>
+                          </button>
+                        ) : (
+                          <>
+                            {/* BOTÃO INICIAR (PLAY) */}
+                            <button
+                              type="button"
+                              onClick={() => playRecordingAudio(rec)}
+                              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                                isPlaying
+                                  ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/25 ring-2 ring-emerald-400'
+                                  : 'bg-zinc-800 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30'
+                              }`}
+                              title="Iniciar reprodução do áudio gravado"
+                            >
+                              <span className="text-sm">▶</span>
+                              <span>Iniciar</span>
+                            </button>
 
-                      {/* DETALHES DO ÁUDIO */}
-                      <div className="flex-1 min-w-[140px]">
-                        <strong className="block text-white text-sm font-semibold truncate">{rec.song_title}</strong>
-                        <small className="text-xs text-zinc-400 font-mono">{rec.duration} segundos de áudio</small>
+                            {/* BOTÃO PARAR (STOP) */}
+                            <button
+                              type="button"
+                              onClick={stopRecordingAudio}
+                              disabled={!isPlaying}
+                              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 ${
+                                isPlaying
+                                  ? 'bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/30 cursor-pointer'
+                                  : 'bg-zinc-850 text-zinc-600 border border-zinc-800 cursor-not-allowed opacity-60'
+                              }`}
+                              title="Parar áudio gravado"
+                            >
+                              <span className="text-xs">⏹</span>
+                              <span>Parar</span>
+                            </button>
+                          </>
+                        )}
+
+                        {/* DETALHES DO ITEM */}
+                        <div className="flex-1 min-w-[140px]">
+                          <div className="flex items-center gap-2">
+                            <strong className="block text-white text-sm font-semibold truncate">
+                              {rec.song_title}
+                            </strong>
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0 ${
+                                isVideo
+                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              }`}
+                            >
+                              {isVideo ? '📹 Filmagem HD' : '🎙️ Áudio HD'}
+                            </span>
+                          </div>
+                          <small className="text-xs text-zinc-400 font-mono">
+                            {Math.round(rec.duration || 0)}s de {isVideo ? 'filmagem' : 'áudio'} • Protegido com Limitador
+                          </small>
+                        </div>
+
+                        {/* BOTÃO DE DOWNLOAD */}
+                        <button
+                          type="button"
+                          onClick={() => downloadRecordingMedia(rec)}
+                          className="px-3 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
+                          title="Baixar gravação para o dispositivo"
+                        >
+                          <span className="text-sm">📥</span>
+                          <span>Baixar {isVideo ? 'Vídeo' : 'Áudio'}</span>
+                        </button>
+
+                        <div className="recording-wave text-cyan-400 font-mono text-xs hidden lg:block">
+                          {isPlaying ? '▅▇▃▂▆▅▃▇▅▃' : '▁▃▆▂▅▇▃▂▆▅'}
+                        </div>
                       </div>
-
-                      {/* BOTÃO DE DOWNLOAD (BAIXAR ÁUDIO) */}
-                      <button
-                        type="button"
-                        onClick={() => downloadRecordingAudio(rec)}
-                        className="px-3 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
-                        title="Baixar gravação para o dispositivo"
-                      >
-                        <span className="text-sm">📥</span>
-                        <span>Baixar</span>
-                      </button>
-
-                      <div className="recording-wave text-cyan-400 font-mono text-xs hidden lg:block">
-                        {playingRecordingId === rec.id ? '▅▇▃▂▆▅▃▇▅▃' : '▁▃▆▂▅▇▃▂▆▅'}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="empty-state">
                     <div>🎙️</div>
                     <h2>Nenhuma gravação realizada ainda</h2>
                     <p>
-                      Abra qualquer música no Modo Show e clique no botão <strong>🔴 Gravar</strong> para registrar sua voz ou ensaio.
+                      Use o <strong>Estúdio de Gravação & Filmagem</strong> acima para registrar sua voz, violão ou filmar seus ensaios com qualidade profissional e sem estourar o som.
                     </p>
                   </div>
                 )}
@@ -1898,39 +2142,88 @@ export default function App() {
                 <div className="library-grid">
                   {allLibrarySongs
                     .filter((s) => favorites.includes(s.id))
-                    .map((s) => (
-                      <div key={s.id} className="library-card">
-                        <div className="flex items-center justify-between gap-2 mb-3">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSong(s.id)}
-                            title="Excluir música"
-                            className="delete-front-btn"
-                          >
-                            <span>🗑</span>
-                            <span>Excluir</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleFavorite(s.id)}
-                            className="text-lg text-amber-400 bg-transparent p-1"
-                            title="Remover dos favoritos"
-                          >
-                            ★
-                          </button>
+                    .map((s) => {
+                      const isAlreadyInActiveSetlist = Boolean(
+                        activeSetlist?.songs?.some((track) => track.id === s.id)
+                      );
+                      return (
+                        <div key={s.id} className="library-card">
+                          <div className="flex items-center justify-between gap-2 mb-3">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSong(s.id)}
+                              title="Excluir música"
+                              className="delete-front-btn"
+                            >
+                              <span>🗑</span>
+                              <span>Excluir</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleFavorite(s.id)}
+                              className="text-lg text-amber-400 bg-transparent p-1"
+                              title="Remover dos favoritos"
+                            >
+                              ★
+                            </button>
+                          </div>
+                          <h3>{s.title}</h3>
+                          <p>{s.artist}</p>
+                          <div className="flex gap-2 mt-auto">
+                            <button
+                              onClick={() => handleOpenSongInShowMode(s)}
+                              className="hover:border-blue-400 flex-1"
+                            >
+                              Abrir no Modo Show
+                            </button>
+
+                            {/* BOTÃO ADICIONAR SEPARADAMENTE À SETLIST */}
+                            {isAlreadyInActiveSetlist ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (activeSetlist) {
+                                    handleRemoveSongFromSetlist(activeSetlist.id, s.id);
+                                    showToast(`"${s.title}" removida do setlist "${activeSetlist.name}".`);
+                                  }
+                                }}
+                                className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                                title={`Música incluída no setlist "${activeSetlist?.name}". Clique para remover se desejar.`}
+                              >
+                                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                <span>✓ No Setlist</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!activeSetlist) {
+                                    setSongToAddToSetlist(s);
+                                    return;
+                                  }
+                                  await handleAddSongToSetlist(activeSetlist.id, s);
+                                }}
+                                className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-amber-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                                title={activeSetlist ? `Adicionar individualmente ao setlist "${activeSetlist.name}"` : 'Adicionar à Minha Setlist'}
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>+ Setlist</span>
+                              </button>
+                            )}
+
+                            {/* ESCOLHER OUTRO SETLIST */}
+                            <button
+                              type="button"
+                              onClick={() => setSongToAddToSetlist(s)}
+                              className="p-2 rounded-xl bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-white text-xs flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                              title="Escolher outro setlist para esta música..."
+                            >
+                              <ListMusic className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <h3>{s.title}</h3>
-                        <p>{s.artist}</p>
-                        <div className="flex gap-2 mt-auto">
-                          <button
-                            onClick={() => handleOpenSongInShowMode(s)}
-                            className="hover:border-blue-400"
-                          >
-                            Abrir no Modo Show
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               ) : (
                 <div className="empty-state">
@@ -2029,80 +2322,183 @@ export default function App() {
       {/* MODAL ADICIONAR MÚSICA */}
       {showAddSongModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#080f1c] border border-blue-500/30 rounded-2xl w-full max-w-lg p-6 text-white shadow-2xl">
+          <div className="bg-[#080f1c] border border-blue-500/30 rounded-3xl w-full max-w-xl p-6 text-white shadow-2xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="font-tech text-lg text-white">Adicionar Música</h2>
+              <div className="flex items-center gap-2">
+                <Music className="w-5 h-5 text-amber-400" />
+                <h2 className="font-tech text-lg text-white font-bold">Adicionar à Minha Biblioteca</h2>
+              </div>
               <button
                 onClick={() => setShowAddSongModal(false)}
-                className="text-zinc-400 hover:text-white text-xl bg-transparent"
+                className="text-zinc-400 hover:text-white text-xl bg-transparent cursor-pointer p-1"
               >
                 ✕
               </button>
             </div>
-            <form onSubmit={handleCreateSongSubmit} className="flex flex-col gap-3">
-              <div>
-                <label className="text-xs text-zinc-300 mb-1 block">Título da Música</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Lugar ao Sol"
-                  value={newSongTitle}
-                  onChange={(e) => setNewSongTitle(e.target.value)}
-                  className="w-full bg-[#030912] border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-blue-500 outline-none"
-                  required
-                />
-              </div>
 
-              <div>
-                <label className="text-xs text-zinc-300 mb-1 block">Artista / Banda</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Charlie Brown Jr."
-                  value={newSongArtist}
-                  onChange={(e) => setNewSongArtist(e.target.value)}
-                  className="w-full bg-[#030912] border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-blue-500 outline-none"
-                  required
-                />
-              </div>
+            {/* TAB SELECTOR */}
+            <div className="flex bg-[#040914] p-1 rounded-xl border border-zinc-800 mb-4 gap-1">
+              <button
+                type="button"
+                onClick={() => setAddSongModalTab('manual')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  addSongModalTab === 'manual'
+                    ? 'bg-amber-500 text-zinc-950 shadow-md font-black'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                ✍️ Cadastrar Manualmente
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddSongModalTab('catalog')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  addSongModalTab === 'catalog'
+                    ? 'bg-amber-500 text-zinc-950 shadow-md font-black'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>Buscar no Catálogo</span>
+              </button>
+            </div>
 
-              <div>
-                <label className="text-xs text-zinc-300 mb-1 block">Tom (Opcional)</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Em ou G"
-                  value={newSongKey}
-                  onChange={(e) => setNewSongKey(e.target.value)}
-                  className="w-full bg-[#030912] border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-blue-500 outline-none"
-                />
-              </div>
+            {addSongModalTab === 'catalog' ? (
+              <div className="flex flex-col flex-1 overflow-hidden space-y-3">
+                <div className="relative">
+                  <Search size={18} className="absolute left-3.5 top-3.5 text-zinc-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Buscar música ou artista para adicionar..."
+                    value={catalogSearchQuery}
+                    onChange={(e) => handleSearchCatalogForLibrary(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-[#030912] border border-zinc-700 rounded-xl text-white text-sm focus:border-amber-400 outline-none"
+                  />
+                  {catalogSearching && (
+                    <Loader2 size={16} className="absolute right-3.5 top-3.5 text-amber-400 animate-spin" />
+                  )}
+                </div>
 
-              <div>
-                <label className="text-xs text-zinc-300 mb-1 block">Letra da Música</label>
-                <textarea
-                  placeholder="Cole aqui os versos e estrofes para o teleprompter..."
-                  value={newSongLyrics}
-                  onChange={(e) => setNewSongLyrics(e.target.value)}
-                  rows={6}
-                  className="w-full bg-[#030912] border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-blue-500 outline-none font-mono"
-                  required
-                />
-              </div>
+                <div className="overflow-y-auto flex-1 max-h-[360px] space-y-2 pr-1 custom-scrollbar">
+                  {catalogSearchResults.length === 0 ? (
+                    <div className="py-12 text-center text-zinc-400 space-y-2">
+                      <Music className="w-8 h-8 text-zinc-600 mx-auto" />
+                      <p className="text-xs">
+                        {catalogSearchQuery.trim()
+                          ? 'Nenhuma música encontrada com este termo.'
+                          : 'Digite o nome de uma música ou artista para pesquisar e adicionar separadamente.'}
+                      </p>
+                    </div>
+                  ) : (
+                    catalogSearchResults.map((item) => {
+                      const isAdded = catalogAddedIds.includes(item.id) || allLibrarySongs.some((s) => s.id === item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          className="p-3 rounded-2xl bg-[#030912] border border-zinc-800 flex items-center justify-between gap-3 hover:border-zinc-700 transition-colors"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <strong className="text-white text-xs font-bold block truncate">{item.title}</strong>
+                            <span className="text-zinc-400 text-[11px] block truncate">{item.artist}</span>
+                          </div>
+                          {isAdded ? (
+                            <span className="px-3 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold shrink-0 flex items-center gap-1">
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              <span>Na Biblioteca</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleAddCatalogSongToLibrary(item)}
+                              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shrink-0"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Adicionar</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
 
-              <div className="flex justify-end gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddSongModal(false)}
-                  className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs font-bold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="primary-button"
-                >
-                  Salvar Música
-                </button>
+                <div className="flex justify-end pt-2 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSongModal(false)}
+                    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold"
+                  >
+                    Fechar
+                  </button>
+                </div>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleCreateSongSubmit} className="flex flex-col gap-3 overflow-y-auto">
+                <div>
+                  <label className="text-xs text-zinc-300 mb-1 block">Título da Música</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Lugar ao Sol"
+                    value={newSongTitle}
+                    onChange={(e) => setNewSongTitle(e.target.value)}
+                    className="w-full bg-[#030912] border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-amber-400 outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 mb-1 block">Artista / Banda</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Charlie Brown Jr."
+                    value={newSongArtist}
+                    onChange={(e) => setNewSongArtist(e.target.value)}
+                    className="w-full bg-[#030912] border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-amber-400 outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 mb-1 block">Tom (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Em ou G"
+                    value={newSongKey}
+                    onChange={(e) => setNewSongKey(e.target.value)}
+                    className="w-full bg-[#030912] border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-amber-400 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-zinc-300 mb-1 block">Letra da Música</label>
+                  <textarea
+                    placeholder="Cole aqui os versos e estrofes para o teleprompter..."
+                    value={newSongLyrics}
+                    onChange={(e) => setNewSongLyrics(e.target.value)}
+                    rows={5}
+                    className="w-full bg-[#030912] border border-zinc-700 rounded-lg p-3 text-white text-sm focus:border-amber-400 outline-none font-mono"
+                    required
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSongModal(false)}
+                    className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs font-bold"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="primary-button"
+                  >
+                    Salvar Música
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -2313,6 +2709,31 @@ export default function App() {
           setUserSongs((prev) => [song, ...prev.filter((s) => s.id !== song.id)]);
         }}
         onShowToast={showToast}
+      />
+
+      {/* MODAL: ADICIONAR MÚSICA DA BIBLIOTECA À MINHA SETLIST */}
+      <SelectSetlistForSongModal
+        isOpen={Boolean(songToAddToSetlist)}
+        song={songToAddToSetlist}
+        playlists={playlists}
+        onClose={() => setSongToAddToSetlist(null)}
+        onAddSongToPlaylist={handleAddSongToSetlist}
+        onRemoveSongFromPlaylist={handleRemoveSongFromSetlist}
+        onCreatePlaylist={async (name) => {
+          const created = await createPlaylist(user?.uid || 'guest', name);
+          setPlaylists((prev) => [created, ...prev]);
+          return created;
+        }}
+        onShowToast={showToast}
+      />
+
+      {/* MODAL: ASSISTIR FILMAGEM EM VÍDEO HD */}
+      <VideoPlaybackModal
+        isOpen={Boolean(activeVideoModal)}
+        recording={activeVideoModal}
+        onClose={() => setActiveVideoModal(null)}
+        onDelete={handleDeleteRecording}
+        onDownload={downloadRecordingMedia}
       />
 
       {/* BARRA DE NAVEGAÇÃO INFERIOR PARA CELULARES E TABLETS (MOBILE TAB BAR) */}

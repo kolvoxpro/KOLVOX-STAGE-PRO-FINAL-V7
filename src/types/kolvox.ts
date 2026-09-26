@@ -50,8 +50,9 @@ export interface Recording {
   song_id?: string;
   song_title: string;
   song_artist?: string;
-  file_url: string; // Base64 audio URI or object storage key
+  file_url: string; // Base64 audio/video URI or object storage key
   duration: number; // in seconds
+  media_type?: 'audio' | 'video';
   created_at: string;
 }
 

@@ -319,10 +319,11 @@ export const MySongsView: React.FC<MySongsViewProps> = ({
 
                   <button
                     onClick={() => openPlaylistModal(song)}
-                    className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
-                    title="Adicionar a um repertório"
+                    className="px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Adicionar à minha setlist"
                   >
                     <Plus className="w-3.5 h-3.5" />
+                    <span>Setlist</span>
                   </button>
                   <button
                     onClick={() => onOpenEditModal(song)}

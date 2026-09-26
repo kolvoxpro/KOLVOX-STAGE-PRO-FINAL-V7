@@ -292,11 +292,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         <button
                           id={`kolvox-lib-add-to-setlist-${song.id}`}
                           onClick={() => setSongToAddToPlaylist(song)}
-                          className="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1 transition-colors"
-                          title="Adicionar à Setlist"
+                          className="py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="Adicionar à Minha Setlist"
                         >
                           <ListMusic className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Setlist</span>
+                          <span>+ Setlist</span>
                         </button>
 
                         <button

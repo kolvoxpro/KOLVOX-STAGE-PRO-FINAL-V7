@@ -446,10 +446,10 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
         </div>
 
         {/* CONTROLES DE ROLAGEM (DESKTOP) */}
-        <aside className="show-controls">
+        <aside className="show-controls overflow-y-auto max-h-[calc(100vh-140px)] custom-scrollbar flex flex-col gap-2.5">
           <span className="control-title">VELOCIDADE DA LETRA</span>
 
-          <div className="speed-control">
+          <div className="speed-control my-1">
             <button onClick={() => changeSpeed(-0.25)}>−</button>
             <strong id="speedValue">{speed.toFixed(1)}x</strong>
             <button onClick={() => changeSpeed(0.25)}>+</button>
@@ -468,7 +468,7 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
           </div>
 
           {/* MODO VELOCIDADE TEMPO REAL (BPM / TEMPO DA MÚSICA) */}
-          <div className="mt-3 p-3 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex flex-col gap-2">
+          <div className="mt-1 p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 flex flex-col gap-1.5 shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono uppercase font-bold text-amber-400 flex items-center gap-1">
                 <Zap className="w-3 h-3" />
@@ -486,40 +486,42 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
                   );
                   setTimeout(() => setSavedRecordingToast(null), 3000);
                 }}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+                className={`px-2 py-0.5 rounded-full text-[9px] font-bold transition-all cursor-pointer ${
                   isRealTempoMode
                     ? 'bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/30'
                     : 'bg-zinc-800 text-zinc-400 hover:text-white'
                 }`}
               >
-                {isRealTempoMode ? 'ATIVO' : 'DESLIGADO'}
+                {isRealTempoMode ? 'ATIVO' : 'OFF'}
               </button>
             </div>
 
-            <p className="text-[10px] text-zinc-400 leading-tight">
+            <p className="text-[9px] text-zinc-400 leading-tight">
               {isRealTempoMode
                 ? `⚡ Sincronizado: ${Math.floor(customDurationSeconds / 60)}:${String(customDurationSeconds % 60).padStart(2, '0')} (${songBpm} BPM)`
-                : 'Ajusta a rolagem para passar a letra exatamente no tempo real da música.'}
+                : 'Acompanha o andamento exato da canção.'}
             </p>
 
             <button
               type="button"
               id="btn-open-tempo-modal"
               onClick={() => setShowTempoModal(true)}
-              className="w-full py-1.5 px-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              className="w-full py-1 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer"
             >
               <Sliders className="w-3 h-3 text-amber-400" />
               <span>Ajustar BPM / Tempo</span>
             </button>
           </div>
 
-          <button
-            id="recordButton"
-            className={`record-show-button ${isRecording ? 'recording' : ''}`}
-            onClick={toggleRecording}
-          >
-            {isRecording ? `🔴 Gravando (${recordingTime}s)` : '🔴 Gravar'}
-          </button>
+          <div className="pt-1 mt-auto shrink-0">
+            <button
+              id="recordButton"
+              className={`record-show-button !mt-0 ${isRecording ? 'recording' : ''}`}
+              onClick={toggleRecording}
+            >
+              {isRecording ? `🔴 Gravando (${recordingTime}s)` : '🔴 Gravar'}
+            </button>
+          </div>
         </aside>
       </main>
 
@@ -533,10 +535,13 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
           />
         </div>
 
-        <div className="show-player-content w-full max-w-4xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 w-full">
-            {/* GRUPO ESQUERDA: GRAVAR, VELOCIDADE & FONTE */}
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start flex-wrap">
+        <div className="show-player-content w-full max-w-5xl mx-auto">
+          {/* ========================================================= */}
+          {/* 1. MODO DESKTOP / TABLET (>= 768px / md): 3 COLUNAS LIMPAS */}
+          {/* ========================================================= */}
+          <div className="hidden md:flex items-center justify-between w-full gap-4">
+            {/* GRUPO ESQUERDA: GRAVAR & FONTE */}
+            <div className="flex items-center gap-2.5 shrink-0 flex-1 justify-start">
               <button
                 id="mobileRecordButton"
                 className={`record-show-button-mobile shrink-0 ${isRecording ? 'recording' : ''}`}
@@ -555,36 +560,56 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
                 <button onClick={() => changeSpeed(0.25)} aria-label="Aumentar velocidade">+</button>
               </div>
 
-              {/* Controles de fonte em mobile */}
-              <div className="flex sm:hidden items-center gap-1 shrink-0">
-                <button onClick={() => changeFontSize(-2)} className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-bold border border-zinc-700" title="Diminuir fonte">A−</button>
-                <button onClick={() => changeFontSize(2)} className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-bold border border-zinc-700" title="Aumentar fonte">A+</button>
+              <div className="flex items-center gap-1 shrink-0 ml-1">
+                <button
+                  type="button"
+                  onClick={() => changeFontSize(-2)}
+                  className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/80 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center"
+                  title="Diminuir fonte"
+                >
+                  A−
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeFontSize(2)}
+                  className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/80 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center"
+                  title="Aumentar fonte"
+                >
+                  A+
+                </button>
               </div>
             </div>
 
-            {/* GRUPO CENTRAL: TRANSPORTE DE MÚSICA & ROLAGEM */}
-            <div className="player-controls flex items-center justify-center gap-2 sm:gap-3 w-full sm:w-auto">
-              <button onClick={lyricsStart} title="Voltar ao início da letra" className="hover:text-white transition-colors p-1.5 text-xs text-zinc-400 hidden xs:inline-flex">
+            {/* GRUPO CENTRAL: TRANSPORTE DE MÚSICA & ROLAGEM (SEM SOBREPOSIÇÃO) */}
+            <div className="player-controls flex items-center justify-center gap-3 shrink-0 flex-nowrap">
+              <button
+                type="button"
+                onClick={lyricsStart}
+                title="Voltar ao início da letra"
+                className="w-9 h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center justify-center text-xs transition-colors cursor-pointer shrink-0"
+              >
                 |◀
               </button>
 
               {hasPlaylist && (
                 <button
+                  type="button"
                   id="btn-prev-song-setlist"
                   onClick={handlePrevSong}
                   disabled={!prevSong}
-                  className="px-2.5 py-1.5 rounded-xl bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700/60 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold disabled:opacity-30 shrink-0"
+                  className="px-3 py-2 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700/80 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold disabled:opacity-30 shrink-0 shadow-sm"
                   title={prevSong ? `Anterior: ${prevSong.title}` : 'Música anterior'}
                 >
                   <SkipBack className="w-3.5 h-3.5 fill-current" />
-                  <span className="text-xs">Ant</span>
+                  <span>Ant</span>
                 </button>
               )}
 
               {/* BOTÃO PLAY / PAUSE TELEPROMPTER */}
               <button
+                type="button"
                 id="playButton"
-                className="play-main hover:scale-105 active:scale-95 transition-transform shrink-0"
+                className="play-main hover:scale-105 active:scale-95 transition-transform shrink-0 cursor-pointer"
                 onClick={toggleLyrics}
                 title={isPlaying ? 'Pausar rolagem automática' : 'Iniciar rolagem automática'}
               >
@@ -593,33 +618,218 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
 
               {hasPlaylist && (
                 <button
+                  type="button"
                   id="btn-next-song-setlist-main"
                   onClick={handleNextSong}
                   disabled={!nextSong}
-                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 font-black text-xs tracking-wide flex items-center gap-1 shadow-md active:scale-95 transition-all cursor-pointer border border-amber-300/50 disabled:opacity-40 shrink-0"
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 font-black text-xs tracking-wide flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer border border-amber-300/50 disabled:opacity-40 shrink-0"
                   title={nextSong ? `Próxima: ${nextSong.title}` : 'Próxima música'}
                 >
-                  <span className="text-xs">Próx</span>
+                  <span>Próx</span>
                   <SkipForward className="w-3.5 h-3.5 fill-current" />
                 </button>
               )}
 
-              <button onClick={lyricsEnd} title="Ir ao final da letra" className="hover:text-white transition-colors p-1.5 text-xs text-zinc-400 hidden xs:inline-flex">
+              <button
+                type="button"
+                onClick={lyricsEnd}
+                title="Ir ao final da letra"
+                className="w-9 h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center justify-center text-xs transition-colors cursor-pointer shrink-0"
+              >
                 ▶|
               </button>
             </div>
 
-            {/* GRUPO DIREITA: DESKTOP FONTE E SAIR */}
-            <div className="player-options hidden sm:flex items-center gap-2">
-              <button onClick={() => changeFontSize(-2)} title="Diminuir fonte">
-                A−
+            {/* GRUPO DIREITA: SAIR E TELA CHEIA */}
+            <div className="player-options flex items-center justify-end gap-2 shrink-0 flex-1">
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/80 text-xs font-bold transition-colors cursor-pointer"
+                title="Tela Cheia"
+              >
+                ⛶
               </button>
-              <button onClick={() => changeFontSize(2)} title="Aumentar fonte">
-                A+
-              </button>
-              <button onClick={onClose} title="Sair do modo show">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                title="Sair do modo show"
+              >
                 ✕ Sair
               </button>
+            </div>
+          </div>
+
+          {/* ========================================================= */}
+          {/* 2. MODO CELULAR (< md): A COLUNA COMPLETA NO RODAPÉ       */}
+          {/* ========================================================= */}
+          <div className="flex md:hidden flex-col w-full gap-2.5">
+            {/* LINHA 1: TRANSPORTE PRINCIPAL (SEM NENHUMA SOBREPOSIÇÃO) */}
+            <div className="flex items-center justify-center gap-2.5 w-full shrink-0 flex-nowrap">
+              <button
+                type="button"
+                onClick={lyricsStart}
+                title="Voltar ao início"
+                className="w-8 h-8 rounded-lg bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 flex items-center justify-center text-xs shrink-0"
+              >
+                |◀
+              </button>
+
+              {hasPlaylist && (
+                <button
+                  type="button"
+                  id="mobile-btn-prev-song"
+                  onClick={handlePrevSong}
+                  disabled={!prevSong}
+                  className="px-2.5 py-1.5 rounded-xl bg-zinc-850 text-zinc-200 border border-zinc-700/80 flex items-center gap-1 text-xs font-bold disabled:opacity-30 shrink-0"
+                  title="Música anterior"
+                >
+                  <SkipBack className="w-3.5 h-3.5 fill-current" />
+                  <span>Ant</span>
+                </button>
+              )}
+
+              {/* BOTÃO PLAY / PAUSE CENTRALIZADO */}
+              <button
+                type="button"
+                id="mobilePlayButton"
+                className="play-main hover:scale-105 active:scale-95 transition-transform shrink-0"
+                onClick={toggleLyrics}
+                title={isPlaying ? 'Pausar rolagem' : 'Iniciar rolagem'}
+              >
+                {isPlaying ? '❚❚' : '▶'}
+              </button>
+
+              {hasPlaylist && (
+                <button
+                  type="button"
+                  id="mobile-btn-next-song"
+                  onClick={handleNextSong}
+                  disabled={!nextSong}
+                  className="px-3 py-1.5 rounded-xl bg-amber-400 text-zinc-950 font-black text-xs flex items-center gap-1 shadow-md shrink-0"
+                  title="Próxima música"
+                >
+                  <span>Próx</span>
+                  <SkipForward className="w-3.5 h-3.5 fill-current" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={lyricsEnd}
+                title="Ir ao final"
+                className="w-8 h-8 rounded-lg bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 flex items-center justify-center text-xs shrink-0"
+              >
+                ▶|
+              </button>
+            </div>
+
+            {/* LINHA 2: COLUNA DE VELOCIDADE (STEPPER + PRESETS) */}
+            <div className="flex items-center justify-between gap-2 w-full flex-wrap bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-2">
+              {/* Stepper de velocidade */}
+              <div className="mobile-speed-control flex items-center shrink-0">
+                <button onClick={() => changeSpeed(-0.25)} aria-label="Diminuir velocidade">−</button>
+                <span className="speed-val font-mono">{speed.toFixed(1)}x</span>
+                <button onClick={() => changeSpeed(0.25)} aria-label="Aumentar velocidade">+</button>
+              </div>
+
+              {/* Chips rápidos de velocidade da coluna */}
+              <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar shrink-0 py-0.5">
+                {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSpeed(s)}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
+                      speed === s
+                        ? 'bg-amber-400 text-zinc-950 shadow-sm font-black'
+                        : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800'
+                    }`}
+                  >
+                    {s}x
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* LINHA 3: TEMPO REAL (BPM), GRAVAÇÃO & CONTROLES EXTRAS */}
+            <div className="flex items-center justify-between gap-2 w-full flex-wrap">
+              {/* Tempo Real (BPM) da coluna */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRealTempoMode(!isRealTempoMode);
+                    setSavedRecordingToast(
+                      !isRealTempoMode
+                        ? `Modo Tempo Real ativado (${songBpm} BPM)`
+                        : 'Modo manual ativado'
+                    );
+                    setTimeout(() => setSavedRecordingToast(null), 3000);
+                  }}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                    isRealTempoMode
+                      ? 'bg-amber-400 text-zinc-950 shadow-md font-black'
+                      : 'bg-zinc-900 border border-zinc-800 text-zinc-400'
+                  }`}
+                  title="Alternar Modo Tempo Real"
+                >
+                  <Zap className="w-3 h-3" />
+                  <span>{isRealTempoMode ? 'BPM ON' : 'BPM OFF'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowTempoModal(true)}
+                  className="px-2 py-1 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                  title="Ajustar BPM / Tempo"
+                >
+                  <Sliders className="w-3 h-3 text-amber-400" />
+                  <span>Ajustar</span>
+                </button>
+              </div>
+
+              {/* Gravação da coluna */}
+              <button
+                id="mobileFooterRecordButton"
+                className={`record-show-button-mobile shrink-0 ${isRecording ? 'recording' : ''}`}
+                onClick={toggleRecording}
+                title="Gravar apresentação"
+              >
+                <span className="rec-dot">●</span>
+                <span className="rec-label text-xs">
+                  {isRecording ? `${recordingTime}s` : 'Gravar'}
+                </span>
+              </button>
+
+              {/* Fonte & Sair */}
+              <div className="flex items-center gap-1 shrink-0 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => changeFontSize(-2)}
+                  className="w-7 h-7 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 text-xs font-bold"
+                  title="Diminuir fonte"
+                >
+                  A−
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeFontSize(2)}
+                  className="w-7 h-7 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 text-xs font-bold"
+                  title="Aumentar fonte"
+                >
+                  A+
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-bold"
+                  title="Sair"
+                >
+                  ✕ Sair
+                </button>
+              </div>
             </div>
           </div>
         </div>

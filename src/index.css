@@ -2270,8 +2270,10 @@ button {
 }
 
 .show-controls {
-  padding: 20px;
+  padding: 16px;
   height: fit-content;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
   background: var(--teleprompter-controls-bg);
   border: 1px solid var(--teleprompter-controls-border);
   border-radius: 12px;
@@ -2347,11 +2349,14 @@ button {
 /* PLAYER */
 
 .show-player {
-  height: 110px;
-  padding: 15px 35px;
-  border-top: 1px solid rgba(255,255,255,.06);
-  background: rgba(2,6,12,.95);
+  min-height: 90px;
+  height: auto;
+  padding: 12px 24px 16px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  background: rgba(3, 8, 16, 0.98);
+  backdrop-filter: blur(14px);
   position: relative;
+  z-index: 40;
 }
 
 .progress {
@@ -2372,10 +2377,12 @@ button {
 
 .show-player-content {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  position: relative;
-  margin-top: 15px;
+  width: 100%;
+  margin-top: 10px;
+  gap: 10px;
 }
 
 .mobile-tablet-controls {
@@ -2386,7 +2393,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 14px;
+  padding: 7px 14px;
   background: rgba(239, 68, 68, 0.16);
   color: #fca5a5;
   border: 1px solid rgba(239, 68, 68, 0.45);
@@ -2469,44 +2476,46 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-}
-
-.player-controls button {
-  background: transparent;
-  color: #9cabc0;
-  font-size: 16px;
+  gap: 12px;
+  flex-wrap: nowrap;
 }
 
 .play-main {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
   border-radius: 50%;
   color: white !important;
   background: linear-gradient(135deg, var(--blue), var(--purple)) !important;
-  box-shadow: 0 0 30px rgba(0,140,255,.35);
+  box-shadow: 0 0 25px rgba(0,140,255,.45);
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0 4px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .player-options {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
   display: flex;
-  gap: 5px;
+  align-items: center;
+  gap: 8px;
 }
 
 .player-options button {
-  background: rgba(255,255,255,.04);
-  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
   color: var(--muted);
-  padding: 6px 10px;
-  border-radius: 5px;
-  font-size: 10px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
   font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.player-options button:hover {
+  background: rgba(255,255,255,.12);
+  color: #ffffff;
 }
 
 /* ============================= */

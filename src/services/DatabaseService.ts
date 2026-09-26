@@ -264,7 +264,7 @@ export async function deletePlaylist(userId: string, playlistId: string): Promis
   }
 }
 
-// Recordings CRUD (Stores Audio in IndexedDB/Storage with Firestore Metadata)
+// Recordings CRUD (Stores Audio/Video in IndexedDB/Storage with Firestore Metadata)
 export async function saveRecording(
   userId: string,
   recording: {
@@ -273,10 +273,12 @@ export async function saveRecording(
     song_artist?: string;
     file_url: string;
     duration: number;
+    media_type?: 'audio' | 'video';
   }
 ): Promise<Recording> {
   const now = new Date().toISOString();
   let id = 'rec_' + Date.now();
+  const media_type = recording.media_type || (recording.file_url.startsWith('data:video') ? 'video' : 'audio');
   
   if (userId && userId !== 'guest') {
     try {
@@ -288,10 +290,12 @@ export async function saveRecording(
         song_artist: recording.song_artist || '',
         file_url: recording.file_url,
         duration: recording.duration,
+        media_type,
         created_at: now,
       });
       id = docRef.id;
-      await logUserActivity(userId, 'SAVE_RECORDING', `Gravação de: ${recording.song_title} (${Math.round(recording.duration)}s)`);
+      const typeLabel = media_type === 'video' ? 'Vídeo/Filmagem' : 'Áudio';
+      await logUserActivity(userId, 'SAVE_RECORDING', `${typeLabel} de: ${recording.song_title} (${Math.round(recording.duration)}s)`);
     } catch (e) {
       console.warn('Firestore saveRecording fallback to local storage:', e);
     }
@@ -301,6 +305,7 @@ export async function saveRecording(
     id,
     user_id: userId,
     ...recording,
+    media_type,
     created_at: now,
   };
 

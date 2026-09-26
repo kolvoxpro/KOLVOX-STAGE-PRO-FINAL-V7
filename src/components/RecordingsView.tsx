@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Song } from '../types/index.ts';
 import {
   Mic,
+  Video,
   Square,
   Pause,
   Play,
@@ -17,6 +18,10 @@ import {
   Maximize2,
   Minimize2,
   Share2,
+  Camera,
+  ShieldCheck,
+  Zap,
+  SwitchCamera,
 } from 'lucide-react';
 import { KolvoxLogo } from './KolvoxLogo';
 
@@ -29,6 +34,7 @@ interface RecordingItem {
   date: string;
   audioBlobUrl?: string;
   lyricsSnippet?: string;
+  mediaType?: 'audio' | 'video';
 }
 
 interface RecordingsViewProps {
@@ -83,16 +89,29 @@ export const RecordingsView: React.FC<RecordingsViewProps> = ({
   // Recording Engine State
   const [isRecordingLive, setIsRecordingLive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [recordingMode, setRecordingMode] = useState<'audio' | 'video'>('audio');
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
+  const liveVideoPreviewRef = useRef<HTMLVideoElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   // Player state
   const [currentTrack, setCurrentTrack] = useState<RecordingItem>(recordings[0]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(42); // percentage
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Attach live video preview
+  useEffect(() => {
+    if (liveVideoPreviewRef.current && liveStream) {
+      liveVideoPreviewRef.current.srcObject = liveStream;
+      liveVideoPreviewRef.current.play().catch(() => {});
+    }
+  }, [liveStream, isRecordingLive]);
 
   // Timer counter for live recording
   useEffect(() => {
@@ -116,11 +135,86 @@ export const RecordingsView: React.FC<RecordingsViewProps> = ({
     return `00:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const startLiveRecording = async () => {
+  const startLiveRecording = async (overrideMode?: 'audio' | 'video') => {
+    const targetMode = overrideMode || recordingMode;
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
+        const audioConstraints = {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false,
+          sampleRate: 48000,
+          channelCount: 2,
+        };
+
+        const mediaConstraints: MediaStreamConstraints =
+          targetMode === 'video'
+            ? {
+                audio: audioConstraints,
+                video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode },
+              }
+            : {
+                audio: audioConstraints,
+                video: false,
+              };
+
+        let rawStream: MediaStream;
+        try {
+          rawStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+        } catch (mediaErr) {
+          if (targetMode === 'video') {
+            rawStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+            setRecordingMode('audio');
+          } else {
+            throw mediaErr;
+          }
+        }
+
+        setLiveStream(rawStream);
+
+        // Web Audio Studio Limiter (anti-estouro de som)
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioCtx({ sampleRate: 48000 });
+        audioContextRef.current = audioCtx;
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
+
+        const micSource = audioCtx.createMediaStreamSource(rawStream);
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(0.92, audioCtx.currentTime);
+
+        const limiter = audioCtx.createDynamicsCompressor();
+        limiter.threshold.setValueAtTime(-2.0, audioCtx.currentTime);
+        limiter.knee.setValueAtTime(4.0, audioCtx.currentTime);
+        limiter.ratio.setValueAtTime(20.0, audioCtx.currentTime);
+        limiter.attack.setValueAtTime(0.002, audioCtx.currentTime);
+        limiter.release.setValueAtTime(0.08, audioCtx.currentTime);
+
+        const studioDest = audioCtx.createMediaStreamDestination();
+        micSource.connect(gainNode);
+        gainNode.connect(limiter);
+        limiter.connect(studioDest);
+
+        const tracks: MediaStreamTrack[] = [studioDest.stream.getAudioTracks()[0]];
+        if (targetMode === 'video' && rawStream.getVideoTracks().length > 0) {
+          tracks.unshift(rawStream.getVideoTracks()[0]);
+        }
+        const recorderStream = new MediaStream(tracks);
+
+        const mimeType =
+          targetMode === 'video'
+            ? (['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].find((t) =>
+                MediaRecorder.isTypeSupported(t)
+              ) || '')
+            : (['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((t) =>
+                MediaRecorder.isTypeSupported(t)
+              ) || '');
+
+        const mediaRecorder = new MediaRecorder(recorderStream, {
+          ...(mimeType ? { mimeType } : {}),
+          audioBitsPerSecond: 192000,
+        });
         mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
 
@@ -131,27 +225,37 @@ export const RecordingsView: React.FC<RecordingsViewProps> = ({
         };
 
         mediaRecorder.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          const audioUrl = URL.createObjectURL(audioBlob);
+          const blobType = mimeType || (targetMode === 'video' ? 'video/webm' : 'audio/webm');
+          const mediaBlob = new Blob(audioChunksRef.current, { type: blobType });
+          const mediaUrl = URL.createObjectURL(mediaBlob);
           const newRec: RecordingItem = {
             id: `rec-${Date.now()}`,
-            title: activeSong?.title || 'Gravação Ao Vivo',
+            title:
+              activeSong?.title ||
+              (targetMode === 'video' ? 'Filmagem de Palco' : 'Gravação de Voz & Instrumento'),
             artist: activeSong?.artist || 'KOLVOX Studio',
             duration: formatTimer(recordingSeconds).substring(3),
             durationSeconds: recordingSeconds,
             date: new Date().toLocaleDateString('pt-BR'),
-            audioBlobUrl: audioUrl,
-            lyricsSnippet: activeSong?.lyrics?.substring(0, 80) || 'Áudio gravado ao vivo pelo microfone',
+            audioBlobUrl: mediaUrl,
+            mediaType: targetMode,
+            lyricsSnippet:
+              activeSong?.lyrics?.substring(0, 80) ||
+              (targetMode === 'video'
+                ? 'Vídeo e áudio gravados com limitador anti-estouro'
+                : 'Áudio gravado ao vivo sem estourar o som'),
           };
           setRecordings((prev) => [newRec, ...prev]);
           setCurrentTrack(newRec);
-          stream.getTracks().forEach((t) => t.stop());
+          rawStream.getTracks().forEach((t) => t.stop());
+          if (audioCtx.state !== 'closed') audioCtx.close().catch(() => {});
+          setLiveStream(null);
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(250);
       }
     } catch (err) {
-      console.warn('Microphone permission notice (simulating recording session):', err);
+      console.warn('Media capture permission notice (simulating recording session):', err);
     }
 
     setRecordingSeconds(0);
@@ -220,9 +324,40 @@ export const RecordingsView: React.FC<RecordingsViewProps> = ({
           </button>
         </header>
 
-        {/* Center Canvas with lyrics snippet and wave */}
-        <div className="max-w-3xl w-full mx-auto text-center my-auto py-10">
-          <div className="text-xl sm:text-2xl font-bold text-zinc-100 leading-relaxed mb-8 px-4">
+        {/* Center Canvas with lyrics snippet and wave or video viewfinder */}
+        <div className="max-w-3xl w-full mx-auto text-center my-auto py-6">
+          {recordingMode === 'video' && (
+            <div className="relative max-w-xl mx-auto rounded-2xl overflow-hidden bg-black border border-cyan-500/40 aspect-video mb-6 shadow-2xl flex items-center justify-center">
+              <video
+                ref={liveVideoPreviewRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const next = facingMode === 'user' ? 'environment' : 'user';
+                  setFacingMode(next);
+                  startLiveRecording('video');
+                }}
+                className="absolute top-3 right-3 p-2 rounded-xl bg-black/60 hover:bg-black/90 backdrop-blur-md border border-zinc-700 text-zinc-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Trocar Câmera"
+              >
+                <SwitchCamera className="w-4 h-4" />
+                <span className="hidden sm:inline">{facingMode === 'user' ? 'Frontal' : 'Traseira'}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Anti-clipping Limiter Pill */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-bold mb-4 shadow-lg">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Limitador Anti-Estouro Ativo (Som Protegido • 48kHz HD)</span>
+          </div>
+
+          <div className="text-xl sm:text-2xl font-bold text-zinc-100 leading-relaxed mb-6 px-4">
             <p className="text-amber-300/80 mb-2 font-mono text-sm tracking-widest uppercase">› Trecho da Música ‹</p>
             {activeSong?.lyrics ? (
               activeSong.lyrics.split('\n').filter(Boolean).slice(0, 3).join(' • ')
@@ -234,26 +369,32 @@ export const RecordingsView: React.FC<RecordingsViewProps> = ({
           </div>
 
           {/* Glowing Animated Waveform */}
-          <div className="relative my-8">
-            <div className="h-24 max-w-2xl mx-auto rounded-2xl overflow-hidden flex items-center justify-center gap-1.5 px-4 bg-blue-950/20 border border-blue-500/30 shadow-[0_0_30px_rgba(99,60,255,0.25)]">
-              {Array.from({ length: 38 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1.5 bg-gradient-to-t from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-300"
-                  style={{
-                    height: isPaused ? '14px' : `${Math.max(16, (Math.sin(i * 0.4 + recordingSeconds * 2) * 0.5 + 0.5) * 78)}px`,
-                    opacity: isPaused ? 0.4 : 0.9,
-                  }}
-                />
-              ))}
+          {recordingMode === 'audio' && (
+            <div className="relative my-6">
+              <div className="h-24 max-w-2xl mx-auto rounded-2xl overflow-hidden flex items-center justify-center gap-1.5 px-4 bg-blue-950/20 border border-blue-500/30 shadow-[0_0_30px_rgba(99,60,255,0.25)]">
+                {Array.from({ length: 38 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-1.5 bg-gradient-to-t from-blue-500 via-purple-500 to-cyan-400 rounded-full transition-all duration-300"
+                    style={{
+                      height: isPaused ? '14px' : `${Math.max(16, (Math.sin(i * 0.4 + recordingSeconds * 2) * 0.5 + 0.5) * 78)}px`,
+                      opacity: isPaused ? 0.4 : 0.9,
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Recording Badge & Timer */}
           <div className="flex items-center justify-center gap-2 mb-3">
             <span className="w-3 h-3 rounded-full bg-red-500 animate-ping inline-block" />
             <span className="text-xs font-extrabold text-red-400 uppercase tracking-widest">
-              {isPaused ? 'GRAVAÇÃO PAUSADA' : 'GRAVANDO AUDIO DO SHOW'}
+              {isPaused
+                ? 'GRAVAÇÃO PAUSADA'
+                : recordingMode === 'video'
+                ? 'FILMANDO VÍDEO & CAPTANDO ÁUDIO HD'
+                : 'GRAVANDO ÁUDIO DO SHOW (ANTI-ESTOURO)'}
             </span>
           </div>
 
@@ -307,23 +448,62 @@ export const RecordingsView: React.FC<RecordingsViewProps> = ({
             <h1 className="text-2xl sm:text-3xl font-orbitron font-black text-white tracking-wide flex items-center gap-3">
               <span>Minhas Gravações</span>
               <span className="text-xs px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-400 font-sans font-bold border border-blue-500/30">
-                {recordings.length} áudios
+                {recordings.length} gravações
               </span>
             </h1>
             <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-              Grave ensaios, barzinhos e shows ao vivo diretamente no Kolvox Stage.
+              Grave ensaios, barzinhos e shows ao vivo com áudio anti-estouro (limitador dinâmico) e filmagem de palco.
             </p>
           </div>
 
-          {/* Big Start Recording Button */}
-          <button
-            id="btn-start-recording"
-            onClick={startLiveRecording}
-            className="kolvox-btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2"
-          >
-            <Mic className="w-4 h-4 text-white" />
-            <span>Iniciar Gravação</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Mode Switcher */}
+            <div className="flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs">
+              <button
+                type="button"
+                onClick={() => setRecordingMode('audio')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  recordingMode === 'audio'
+                    ? 'bg-amber-400 text-zinc-950 shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Áudio HD</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecordingMode('video')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  recordingMode === 'video'
+                    ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-zinc-950 shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span>Filmagem</span>
+              </button>
+            </div>
+
+            {/* Big Start Recording Button */}
+            <button
+              id="btn-start-recording"
+              onClick={() => startLiveRecording(recordingMode)}
+              className="kolvox-btn-primary px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 cursor-pointer shadow-lg shadow-cyan-500/20 hover:scale-102 active:scale-98 transition-all"
+            >
+              {recordingMode === 'video' ? (
+                <>
+                  <Video className="w-4 h-4 text-white" />
+                  <span>Iniciar Filmagem</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="w-4 h-4 text-white" />
+                  <span>Iniciar Gravação</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* List of Recordings Cards (Matching user mockup layout) */}
@@ -344,12 +524,25 @@ export const RecordingsView: React.FC<RecordingsViewProps> = ({
                 <div className="flex items-center gap-3.5 min-w-0">
                   {/* Thumbnail / Wave badge */}
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-900 via-purple-900 to-zinc-950 border border-blue-500/30 flex items-center justify-center shrink-0 shadow-md">
-                    <Mic className="w-5 h-5 text-cyan-400" />
+                    {rec.mediaType === 'video' ? (
+                      <Video className="w-5 h-5 text-cyan-400" />
+                    ) : (
+                      <Mic className="w-5 h-5 text-amber-400" />
+                    )}
                   </div>
 
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="text-base font-bold text-white truncate">{rec.title}</h3>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-md font-black uppercase tracking-wider ${
+                          rec.mediaType === 'video'
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        }`}
+                      >
+                        {rec.mediaType === 'video' ? '📹 Vídeo HD' : '🎙️ Áudio HD'}
+                      </span>
                       {isSelected && isPlaying && (
                         <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
                       )}

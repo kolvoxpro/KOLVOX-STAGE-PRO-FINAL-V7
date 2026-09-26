@@ -6,7 +6,7 @@ import { getAllLocalUsers, updateLocalUser, deleteLocalUser } from '../services/
 import { ClientActivityAuditTab } from './ClientActivityAuditTab.tsx';
 import { safeResponseJson, safeFetchJson } from '../utils/safeFetch.ts';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { auth, db as firestoreDb } from '../lib/firebase.ts';
 import { recordClientActivity } from '../services/ActivityLogger.ts';
 import {
@@ -310,7 +310,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
         });
       }
 
-      // Guarantee NO fake accounts ever appear in the user list
+      // Guarantee NO fake accounts or deleted accounts ever appear in the user list
       const FAKE_USER_EMAILS = [
         'carlos.vocal@gmail.com',
         'mariana.acustico@hotmail.com',
@@ -324,7 +324,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
         'roberto@kolvox.com',
         'camila@kolvox.com',
       ];
-      allUsers = allUsers.filter((u) => !FAKE_USER_EMAILS.includes((u.email || '').toLowerCase().trim()));
+      const deletedBlacklist: string[] = JSON.parse(
+        localStorage.getItem('kolvox_admin_deleted_ids') || '[]'
+      );
+      allUsers = allUsers.filter(
+        (u) =>
+          !FAKE_USER_EMAILS.includes((u.email || '').toLowerCase().trim()) &&
+          !deletedBlacklist.includes(String(u.id)) &&
+          (!u.email || !deletedBlacklist.includes(u.email.toLowerCase().trim()))
+      );
       setUsersList(allUsers);
 
       const songsData = songsRes ? await safeResponseJson(songsRes, []) : [];
@@ -857,6 +865,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
     setUserToDelete(target);
   };
 
+  const handleAdminDeletePlan = (targetUser: User) => {
+    const targetId = String(targetUser.id);
+    const targetEmail = (targetUser.email || '').toLowerCase().trim();
+    const targetName = targetUser.nomeArtistico || targetUser.nomeCompleto || targetEmail || 'Cliente';
+
+    deleteCustomerPlanData(targetId, targetEmail);
+    localStorage.removeItem('kolvox_sub_' + targetId);
+    localStorage.removeItem('kolvox_trial_override_' + targetId);
+    localStorage.removeItem('kolvox_trial_extended_' + targetId);
+    if (targetEmail) {
+      localStorage.removeItem('kolvox_sub_' + targetEmail);
+      localStorage.removeItem('kolvox_trial_override_' + targetEmail);
+      localStorage.removeItem('kolvox_trial_extended_' + targetEmail);
+    }
+
+    setUsersList((prev) => [...prev]);
+    setAdminToastNotice(`Plano de "${targetName}" excluído e resetado com sucesso.`);
+    setTimeout(() => setAdminToastNotice(null), 3500);
+  };
+
   const handleDeleteSongDirect = async (songId: number, songTitle: string) => {
     try {
       const res = await fetch(`/api/admin/songs/${songId}`, {
@@ -987,19 +1015,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
   const handleConfirmDeleteUser = async () => {
     if (!userToDelete) return;
     setIsActionDeleting(true);
+    const targetId = String(userToDelete.id);
+    const targetEmail = (userToDelete.email || '').toLowerCase().trim();
+    const targetName = userToDelete.nomeArtistico || userToDelete.nomeCompleto || targetEmail || 'Cliente';
+
     try {
-      deleteLocalUser(String(userToDelete.id));
-      if (userToDelete.email) deleteLocalUser(userToDelete.email);
-      await fetch(`/api/admin/users/${userToDelete.id}`, {
+      // 1. Delete customer plan data & local storage credentials
+      deleteCustomerPlanData(targetId, targetEmail);
+      deleteLocalUser(targetId);
+      if (targetEmail) {
+        deleteLocalUser(targetEmail);
+      }
+
+      // 2. Persist in deleted blacklist to prevent resurrected cached records
+      try {
+        const deletedIds: string[] = JSON.parse(
+          localStorage.getItem('kolvox_admin_deleted_ids') || '[]'
+        );
+        if (!deletedIds.includes(targetId)) deletedIds.push(targetId);
+        if (targetEmail && !deletedIds.includes(targetEmail)) deletedIds.push(targetEmail);
+        localStorage.setItem('kolvox_admin_deleted_ids', JSON.stringify(deletedIds));
+      } catch {}
+
+      // 3. Delete from Firestore if exists
+      try {
+        await deleteDoc(doc(firestoreDb, 'users', targetId));
+      } catch (fErr) {
+        console.warn('Firestore user delete notice:', fErr);
+      }
+
+      // 4. Delete on backend server
+      const activeToken = token || localStorage.getItem('kolvox_auth_token') || 'kolvox_master_token_admin';
+      const queryParam = targetEmail ? `?email=${encodeURIComponent(targetEmail)}` : '';
+      await fetch(`/api/admin/users/${encodeURIComponent(targetId)}${queryParam}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${activeToken}` },
       }).catch(() => null);
 
-      setAdminToastNotice(`Usuário ${userToDelete.nomeArtistico || userToDelete.email} foi excluído.`);
+      // 5. Update state immediately so UI updates instantly
+      setUsersList((prev) =>
+        prev.filter(
+          (u) =>
+            String(u.id) !== targetId &&
+            (!targetEmail || (u.email || '').toLowerCase().trim() !== targetEmail)
+        )
+      );
+
+      setAdminToastNotice(`Cliente "${targetName}" excluído com sucesso da base de dados.`);
       setTimeout(() => setAdminToastNotice(null), 3500);
       setUserToDelete(null);
-      fetchAdminData();
-    } catch {
+      setViewingUserModal(null);
+    } catch (err) {
+      console.error('Error deleting user:', err);
       alert('Erro ao excluir usuário.');
     } finally {
       setIsActionDeleting(false);
@@ -2002,12 +2069,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
                                     {u.status === 'ativo' ? 'Bloquear' : 'Desbloquear'}
                                   </button>
 
+                                  {/* Excluir / Resetar Plano */}
                                   <button
-                                    onClick={() => handleDeleteUserDirect(u.id, u.nomeArtistico || u.email, u.email)}
-                                    title="Excluir usuário imediatamente"
-                                    className="btn-action text-zinc-500 hover:text-rose-400 hover:border-rose-500/50 cursor-pointer"
+                                    type="button"
+                                    onClick={() => handleAdminDeletePlan(u)}
+                                    title="Excluir/resetar plano do cliente"
+                                    className="btn-action text-amber-400 hover:text-amber-300 border-amber-500/30 hover:border-amber-400 cursor-pointer flex items-center gap-1"
                                   >
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <Trash2 className="w-3 h-3 text-amber-400" />
+                                    <span>Excluir Plano</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteUserDirect(u.id, u.nomeArtistico || u.email, u.email)}
+                                    title="Excluir usuário permanentemente"
+                                    className="btn-action text-rose-400 hover:text-white border-rose-500/30 hover:border-rose-500/60 hover:bg-rose-500/20 cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                    <span>Excluir Usuário</span>
                                   </button>
                                 </>
                               )}
@@ -2284,6 +2364,40 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
                       >
                         Bloquear Teste
                       </button>
+
+                      {/* Excluir / Resetar Plano */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleAdminDeletePlan(viewingUserModal);
+                          setViewingUserModal(null);
+                        }}
+                        className="btn-action text-amber-300 border-amber-500/40 hover:bg-amber-500/10 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Excluir / Resetar Plano</span>
+                      </button>
+
+                      {/* Excluir Conta de Usuário */}
+                      {String(viewingUserModal.id) !== 'admin_kolvox_master' &&
+                        viewingUserModal.email?.toLowerCase() !== 'koljoseph2020@gmail.com' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const target = viewingUserModal;
+                              setViewingUserModal(null);
+                              handleDeleteUserDirect(
+                                target.id,
+                                target.nomeArtistico || target.email,
+                                target.email
+                              );
+                            }}
+                            className="btn-action text-rose-400 border-rose-500/40 hover:bg-rose-500/20 flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            <span>Excluir Conta do Cliente</span>
+                          </button>
+                        )}
                     </div>
                   </div>
                 </div>
