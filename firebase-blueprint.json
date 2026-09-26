@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Registered artist/vocalist profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "Song": {
+      "title": "Song",
+      "description": "Song lyrics and performance content",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "lyrics": { "type": "string" },
+        "source": { "type": "string" },
+        "source_song_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "title", "artist", "lyrics"]
+    },
+    "Playlist": {
+      "title": "Playlist / Setlist",
+      "description": "Setlists created by the vocalist for live shows",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_email": { "type": "string" },
+        "name": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "name"]
+    },
+    "PlaylistSong": {
+      "title": "Playlist Song Entry",
+      "description": "Item in a setlist",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "playlist_id": { "type": "string" },
+        "song_id": { "type": "string" },
+        "position": { "type": "number" }
+      },
+      "required": ["id", "playlist_id", "song_id", "position"]
+    },
+    "Recording": {
+      "title": "Vocal Recording",
+      "description": "Audio recording captured during performance or rehearsal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "song_id": { "type": "string" },
+        "song_title": { "type": "string" },
+        "song_artist": { "type": "string" },
+        "file_url": { "type": "string" },
+        "duration": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "file_url", "duration"]
+    },
+    "SearchHistory": {
+      "title": "Search History",
+      "description": "Track record of user song searches",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "query": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "query"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "Audit and activity log of the singer actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "action": { "type": "string" },
+        "metadata": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "action"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document"
+    },
+    "/users/{userId}/songs/{songId}": {
+      "schema": "Song",
+      "description": "Personal song library and saved lyrics"
+    },
+    "/users/{userId}/playlists/{playlistId}": {
+      "schema": "Playlist",
+      "description": "Vocalist setlists and playlists"
+    },
+    "/users/{userId}/playlists/{playlistId}/songs/{itemSongId}": {
+      "schema": "PlaylistSong",
+      "description": "Ordered songs inside a setlist"
+    },
+    "/users/{userId}/recordings/{recordingId}": {
+      "schema": "Recording",
+      "description": "Audio recordings metadata and S3/Storage URLs"
+    },
+    "/users/{userId}/search_history/{historyId}": {
+      "schema": "SearchHistory",
+      "description": "Search queries executed"
+    },
+    "/users/{userId}/activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Activity logs for account actions"
+    }
+  }
+}

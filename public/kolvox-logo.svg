@@ -1,0 +1,50 @@
+<svg viewBox="0 0 540 140" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur1" />
+      <feGaussianBlur stdDeviation="16" result="blur2" />
+      <feGaussianBlur stdDeviation="3" result="sharp" />
+      <feMerge>
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="sharp" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <linearGradient id="electric-blue" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0044ff" />
+      <stop offset="50%" stop-color="#00c8ff" />
+      <stop offset="100%" stop-color="#0055ff" />
+    </linearGradient>
+
+    <linearGradient id="neon-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38d9ff" />
+      <stop offset="50%" stop-color="#00f0ff" />
+      <stop offset="100%" stop-color="#00b4ff" />
+    </linearGradient>
+
+    <linearGradient id="white-core" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f0faff" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background is 100% transparent -->
+  <g transform="skewX(-13) translate(30, 20)">
+    <!-- Layer 4: Deep Outer Aura Waves -->
+    <text x="240" y="76" text-anchor="middle" font-family="'Orbitron', 'Inter', system-ui, sans-serif" font-weight="900" font-size="78" letter-spacing="6" fill="none" stroke="#0038cc" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" opacity="0.4">KOLVOX</text>
+    
+    <!-- Layer 3: Vibrant Blue Contour -->
+    <text x="240" y="76" text-anchor="middle" font-family="'Orbitron', 'Inter', system-ui, sans-serif" font-weight="900" font-size="78" letter-spacing="6" fill="none" stroke="#0066ff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" opacity="0.8">KOLVOX</text>
+
+    <!-- Layer 2: Electric Cyan Glow -->
+    <text x="240" y="76" text-anchor="middle" font-family="'Orbitron', 'Inter', system-ui, sans-serif" font-weight="900" font-size="78" letter-spacing="6" fill="none" stroke="url(#electric-blue)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" filter="url(#neon-glow)">KOLVOX</text>
+
+    <!-- Layer 1: Neon Cyan Edge -->
+    <text x="240" y="76" text-anchor="middle" font-family="'Orbitron', 'Inter', system-ui, sans-serif" font-weight="900" font-size="78" letter-spacing="6" fill="none" stroke="url(#neon-cyan)" stroke-width="5" stroke-linejoin="round">KOLVOX</text>
+
+    <!-- Core: Bright White Letters -->
+    <text x="240" y="76" text-anchor="middle" font-family="'Orbitron', 'Inter', system-ui, sans-serif" font-weight="900" font-size="78" letter-spacing="6" fill="url(#white-core)">KOLVOX</text>
+  </g>
+</svg>

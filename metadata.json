@@ -1,0 +1,6 @@
+{
+  "name": "KOLVOX — Seu palco. Suas músicas. Sua voz.",
+  "description": "Seu palco. Suas músicas. Sua voz. Teleprompter profissional com rolagem automática, setlists, repertório e gravação ao vivo.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

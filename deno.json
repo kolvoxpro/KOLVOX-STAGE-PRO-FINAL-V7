@@ -1,0 +1,16 @@
+{
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "build": "npm run build",
+    "start": "deno run --allow-net --allow-env --allow-read --allow-write --allow-run server.ts"
+  },
+  "deploy": {
+    "install": "npm install",
+    "build": "npm run build",
+    "runtime": {
+      "type": "dynamic",
+      "entrypoint": "./server.ts",
+      "cwd": "."
+    }
+  }
+}

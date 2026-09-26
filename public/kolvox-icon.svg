@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- 100% Transparent background -->
+  <circle cx="256" cy="256" r="220" stroke="#00e5ff" stroke-width="6" stroke-dasharray="16 12" opacity="0.3" />
+  <g transform="skewX(-13) translate(50, 60)">
+    <text x="210" y="220" text-anchor="middle" font-family="'Orbitron', 'Inter', system-ui, sans-serif" font-weight="900" font-size="160" fill="none" stroke="#0044ff" stroke-width="40" opacity="0.5">K</text>
+    <text x="210" y="220" text-anchor="middle" font-family="'Orbitron', 'Inter', system-ui, sans-serif" font-weight="900" font-size="160" fill="none" stroke="#00f0ff" stroke-width="16">K</text>
+    <text x="210" y="220" text-anchor="middle" font-family="'Orbitron', 'Inter', system-ui, sans-serif" font-weight="900" font-size="160" fill="#ffffff">K</text>
+  </g>
+  <text x="256" y="420" text-anchor="middle" font-family="'Orbitron', sans-serif" font-weight="900" font-size="52" fill="#ffffff" stroke="#00e5ff" stroke-width="2" letter-spacing="8">KOLVOX</text>
+</svg>
