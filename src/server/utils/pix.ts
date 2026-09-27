@@ -61,7 +61,7 @@ export async function generatePixCharge(options: PixChargeOptions): Promise<Gene
   const cleanTxId = (txId.replace(/[^a-zA-Z0-9]/g, '') || 'KOLVOX').substring(0, 25);
 
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  const formattedAmount = (isNaN(numAmount) || numAmount <= 0 ? 10.0 : numAmount).toFixed(2);
+  const formattedAmount = (isNaN(numAmount) || numAmount <= 0 ? 9.99 : numAmount).toFixed(2);
 
   // Merchant Account Info (Tag 26)
   const gui = formatTLV('00', 'br.gov.bcb.pix');
@@ -86,16 +86,26 @@ export async function generatePixCharge(options: PixChargeOptions): Promise<Gene
   const crc = calculateCRC16(payload);
   const pixCode = `${payload}${crc}`;
 
-  // Generate standard QR code as PNG data URL
-  const qrCodeUrl = await QRCode.toDataURL(pixCode, {
-    errorCorrectionLevel: 'M',
-    margin: 2,
-    scale: 8,
-    color: {
-      dark: '#000000',
-      light: '#FFFFFF',
-    },
-  });
+  // Generate standard QR code with SVG fallback
+  let qrCodeUrl = '';
+  try {
+    qrCodeUrl = await QRCode.toDataURL(pixCode, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      scale: 8,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF',
+      },
+    });
+  } catch {
+    try {
+      const svg = await QRCode.toString(pixCode, { type: 'svg', margin: 2 });
+      qrCodeUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    } catch {
+      qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(pixCode)}`;
+    }
+  }
 
   return {
     pixCode,

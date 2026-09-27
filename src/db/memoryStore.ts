@@ -74,7 +74,7 @@ function getInitialStore(): MemoryStoreData {
         pixReceiverName: 'KOLVOX TECNOLOGIA LTDA',
         pixCity: 'SAO PAULO',
         supportEmail: 'kolvox.pagamentos@gmail.com',
-        monthlyPrice: '10.00',
+        monthlyPrice: '9.99',
         trialDays: 7,
         pixEnabled: true,
         manualPaymentEnabled: true,

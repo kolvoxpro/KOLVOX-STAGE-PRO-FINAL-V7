@@ -130,7 +130,7 @@ export const appSettings = pgTable('app_settings', {
   pixReceiverName: text('pix_receiver_name').default('KOLVOX TECNOLOGIA LTDA').notNull(),
   pixCity: text('pix_city').default('SAO PAULO').notNull(),
   supportEmail: text('support_email').default('kolvox.pagamentos@gmail.com').notNull(),
-  monthlyPrice: text('monthly_price').default('10.00').notNull(),
+  monthlyPrice: text('monthly_price').default('9.99').notNull(),
   trialDays: integer('trial_days').default(7).notNull(),
   pixEnabled: boolean('pix_enabled').default(true).notNull(),
   manualPaymentEnabled: boolean('manual_payment_enabled').default(true).notNull(),

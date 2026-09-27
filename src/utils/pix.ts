@@ -83,8 +83,27 @@ export function generatePixPayload(params: {
 }
 
 export async function generatePixQrDataUrl(pixPayload: string): Promise<string> {
+  // 1. Vector SVG generation - 100% resilient on Vercel, offline, webviews, and mobile without Canvas dependency
   try {
-    return await QRCode.toDataURL(pixPayload, {
+    const svgString = await QRCode.toString(pixPayload, {
+      type: 'svg',
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF',
+      },
+    });
+    if (svgString && svgString.includes('<svg')) {
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
+    }
+  } catch (svgErr) {
+    console.warn('QRCode.toString SVG error, trying canvas:', svgErr);
+  }
+
+  // 2. Standard Canvas PNG Data URL fallback
+  try {
+    const dataUrl = await QRCode.toDataURL(pixPayload, {
       errorCorrectionLevel: 'M',
       margin: 2,
       width: 320,
@@ -93,8 +112,13 @@ export async function generatePixQrDataUrl(pixPayload: string): Promise<string> 
         light: '#FFFFFF',
       },
     });
+    if (dataUrl && dataUrl.startsWith('data:image')) {
+      return dataUrl;
+    }
   } catch (err) {
-    console.error('Error generating PIX QR Code:', err);
-    return '';
+    console.warn('QRCode.toDataURL error, using fallback QR code provider:', err);
   }
+
+  // 3. Resilient fallback image URLs (guaranteed to render on Vercel static deployments)
+  return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(pixPayload)}`;
 }

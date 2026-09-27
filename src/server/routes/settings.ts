@@ -22,7 +22,7 @@ router.get('/public', async (req, res: Response) => {
           pixReceiverName: 'KOLVOX TECNOLOGIA LTDA',
           pixCity: 'SAO PAULO',
           supportEmail: 'kolvox.pagamentos@gmail.com',
-          monthlyPrice: '10.00',
+          monthlyPrice: '9.99',
           trialDays: 7,
           pixEnabled: true,
           manualPaymentEnabled: true,
@@ -33,13 +33,18 @@ router.get('/public', async (req, res: Response) => {
     // Check Gmail integration status to notify public support availability
     const [gmail] = await db.select().from(schema.gmailIntegrations).limit(1);
 
+    const effectiveMonthly =
+      settings.monthlyPrice && settings.monthlyPrice !== '10.00' && settings.monthlyPrice !== '10'
+        ? settings.monthlyPrice
+        : '9.99';
+
     return res.json({
       pixKey: settings.pixKey,
       pixKeyType: settings.pixKeyType,
       pixReceiverName: settings.pixReceiverName,
       pixCity: settings.pixCity,
       supportEmail: settings.supportEmail,
-      monthlyPrice: settings.monthlyPrice,
+      monthlyPrice: effectiveMonthly,
       trialDays: settings.trialDays,
       pixEnabled: settings.pixEnabled,
       manualPaymentEnabled: settings.manualPaymentEnabled,
@@ -54,7 +59,7 @@ router.get('/public', async (req, res: Response) => {
       pixReceiverName: 'KOLVOX TECNOLOGIA LTDA',
       pixCity: 'SAO PAULO',
       supportEmail: 'kolvox.pagamentos@gmail.com',
-      monthlyPrice: '10.00',
+      monthlyPrice: '9.99',
       trialDays: 7,
       pixEnabled: true,
       manualPaymentEnabled: true,
@@ -77,13 +82,15 @@ router.get('/admin', requireAdmin, async (req: AuthRequest, res: Response) => {
           pixReceiverName: 'KOLVOX TECNOLOGIA LTDA',
           pixCity: 'SAO PAULO',
           supportEmail: 'kolvox.pagamentos@gmail.com',
-          monthlyPrice: '10.00',
+          monthlyPrice: '9.99',
           trialDays: 7,
           pixEnabled: true,
           manualPaymentEnabled: true,
           updatedBy: req.user!.id,
         })
         .returning();
+    } else if (settings.monthlyPrice === '10.00' || settings.monthlyPrice === '10') {
+      settings.monthlyPrice = '9.99';
     }
 
     const [gmail] = await db.select().from(schema.gmailIntegrations).limit(1);
@@ -163,7 +170,7 @@ router.put('/admin', requireAdmin, async (req: AuthRequest, res: Response) => {
           pixReceiverName: pixReceiverName?.trim() || 'KOLVOX TECNOLOGIA LTDA',
           pixCity: pixCity?.trim().toUpperCase() || 'SAO PAULO',
           supportEmail: supportEmail?.trim() || 'kolvox.pagamentos@gmail.com',
-          monthlyPrice: monthlyPrice ? String(monthlyPrice) : '10.00',
+          monthlyPrice: monthlyPrice ? String(monthlyPrice) : '9.99',
           trialDays: trialDays ? Number(trialDays) : 7,
           pixEnabled: pixEnabled !== undefined ? Boolean(pixEnabled) : true,
           manualPaymentEnabled: manualPaymentEnabled !== undefined ? Boolean(manualPaymentEnabled) : true,

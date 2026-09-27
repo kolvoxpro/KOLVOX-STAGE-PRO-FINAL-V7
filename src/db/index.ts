@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS app_settings (
   pix_receiver_name TEXT NOT NULL DEFAULT 'KOLVOX TECNOLOGIA LTDA',
   pix_city TEXT NOT NULL DEFAULT 'SAO PAULO',
   support_email TEXT NOT NULL DEFAULT 'kolvox.pagamentos@gmail.com',
-  monthly_price TEXT NOT NULL DEFAULT '10.00',
+  monthly_price TEXT NOT NULL DEFAULT '9.99',
   trial_days INTEGER NOT NULL DEFAULT 7,
   pix_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   manual_payment_enabled BOOLEAN NOT NULL DEFAULT TRUE,

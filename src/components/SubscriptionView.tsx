@@ -43,7 +43,11 @@ interface PublicSettings {
   manualPaymentEnabled: boolean;
 }
 
-export const SubscriptionView: React.FC = () => {
+interface SubscriptionViewProps {
+  onOpenAuthModal?: () => void;
+}
+
+export const SubscriptionView: React.FC<SubscriptionViewProps> = ({ onOpenAuthModal }) => {
   const { user, subscription, trialDaysLeft, isPremiumActive, token, refreshUserData, activateProSubscription } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<'kolvox_pro_monthly' | 'kolvox_pro_yearly'>('kolvox_pro_monthly');
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
@@ -57,7 +61,7 @@ export const SubscriptionView: React.FC = () => {
     pixReceiverName: 'KOLVOX TECNOLOGIA LTDA',
     pixCity: 'SAO PAULO',
     supportEmail: 'kolvox.pagamentos@gmail.com',
-    monthlyPrice: '10.00',
+    monthlyPrice: '9.99',
     trialDays: 7,
     pixEnabled: true,
     manualPaymentEnabled: true,
@@ -97,7 +101,7 @@ export const SubscriptionView: React.FC = () => {
         pixKeyType: 'E-mail',
         pixReceiverName: 'KOLVOX TECNOLOGIA LTDA',
         pixCity: 'SAO PAULO',
-        monthlyPrice: '10.00',
+        monthlyPrice: '9.99',
         trialDays: 7,
         pixEnabled: true,
         manualPaymentEnabled: true,
@@ -110,11 +114,11 @@ export const SubscriptionView: React.FC = () => {
     });
   }, []);
 
-  // 2. Generate Pix via Payment API (Mercado Pago / Certified Pix Gateway)
+  // 2. Generate Pix via Payment API (Mercado Pago / Certified Pix Gateway with client-side fallback)
   useEffect(() => {
     let isMounted = true;
     setLoadingPix(true);
-    const activePrice = selectedPlan === 'kolvox_pro_monthly' ? '10.00' : '99.99';
+    const activePrice = selectedPlan === 'kolvox_pro_monthly' ? (settings.monthlyPrice || '9.99') : '99.99';
 
     createPixPayment({
       userId: user?.uid || user?.id || 'guest',
@@ -668,6 +672,13 @@ export const SubscriptionView: React.FC = () => {
                       alt="QR Code Pix"
                       className="w-52 h-52 object-contain"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        if (!target.dataset.triedFallback) {
+                          target.dataset.triedFallback = '1';
+                          target.src = `https://quickchart.io/qr?size=320&text=${encodeURIComponent(pixPayloadCode)}`;
+                        }
+                      }}
                     />
                   </div>
                 ) : (
@@ -691,7 +702,7 @@ export const SubscriptionView: React.FC = () => {
                         {currentPayment?.provider === 'mercadopago' ? 'Mercado Pago Oficial' : 'Gateway Pix Brasil'}
                       </span>
                       <span className="text-2xl font-black text-amber-400 font-mono">
-                        R$ {selectedPlan === 'kolvox_pro_monthly' ? '10,00' : '99,99'}
+                        R$ {selectedPlan === 'kolvox_pro_monthly' ? (settings.monthlyPrice || '9,99') : '99,99'}
                       </span>
                     </div>
                   </div>
@@ -858,6 +869,39 @@ export const SubscriptionView: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </div>
+
+            {/* Link final para login / criação de conta */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#0f172a] border border-[#00e5ff]/40 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#00e5ff]/15 text-[#00e5ff] flex items-center justify-center font-bold shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-white">Criar Conta ou Fazer Login no App</div>
+                  <div className="text-xs text-slate-400">
+                    Acesse sua conta para começar a usar o repertório, Modo Show e sincronização em tempo real.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="btn-final-auth-link"
+                onClick={() => {
+                  try {
+                    window.history.pushState(null, '', '/?action=login&openAuth=true#login');
+                  } catch {}
+                  if (onOpenAuthModal) {
+                    onOpenAuthModal();
+                  } else {
+                    window.location.href = '/?action=login&openAuth=true#login';
+                  }
+                }}
+                className="w-full sm:w-auto px-5 py-3 rounded-xl bg-[#00e5ff] hover:bg-[#38bdf8] text-[#020617] font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all hover:scale-102 cursor-pointer shrink-0 shadow-md shadow-[#00e5ff]/20"
+              >
+                <span>Acessar Tela de Login / Criar Conta</span>
+                <span>→</span>
+              </button>
             </div>
           </div>
         )}

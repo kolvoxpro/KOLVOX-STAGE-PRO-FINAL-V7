@@ -41,8 +41,8 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({ on
   const [webhookApproved, setWebhookApproved] = useState(false);
 
   const pixKey = 'kolvox.pagamentos@gmail.com';
-  const amount = selectedPlan === 'yearly' ? '99.99' : '10.00';
-  const planLabel = selectedPlan === 'yearly' ? 'Plano Anual (R$ 99,99/ano)' : 'Plano Mensal (R$ 10,00/mês)';
+  const amount = selectedPlan === 'yearly' ? '99.99' : '9.99';
+  const planLabel = selectedPlan === 'yearly' ? 'Plano Anual (R$ 99,99/ano)' : 'Plano Mensal (R$ 9,99/mês)';
   const planType = selectedPlan === 'yearly' ? 'kolvox_pro_yearly' : 'kolvox_pro_monthly';
 
   // 1. Create or update Pix order via Payment API whenever the plan changes
@@ -246,7 +246,7 @@ export const TrialExpiredLockModal: React.FC<TrialExpiredLockModalProps> = ({ on
             }`}
           >
             <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Plano Mensal</div>
-            <div className="text-2xl font-black text-white font-mono mt-1">R$ 10,00</div>
+            <div className="text-2xl font-black text-white font-mono mt-1">R$ 9,99</div>
             <div className="text-[11px] text-zinc-400 mt-0.5">cobrado mensalmente</div>
           </button>
 

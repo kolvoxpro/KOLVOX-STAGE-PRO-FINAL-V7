@@ -31,6 +31,7 @@ interface AddSongToSetlistModalProps {
   initialTab?: 'global' | 'library' | 'new';
   onClose: () => void;
   onAddSongToSetlist: (playlistId: string, song: Song) => Promise<void>;
+  onRemoveSongFromSetlist?: (playlistId: string, songId: string) => Promise<void> | void;
   onSongSavedToLibrary: (song: Song) => void;
   onShowToast: (msg: string) => void;
 }
@@ -43,6 +44,7 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
   initialTab = 'global',
   onClose,
   onAddSongToSetlist,
+  onRemoveSongFromSetlist,
   onSongSavedToLibrary,
   onShowToast,
 }) => {
@@ -684,15 +686,25 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                             </div>
 
                             {isAlreadyIn ? (
-                              <span className="px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (onRemoveSongFromSetlist) {
+                                    await onRemoveSongFromSetlist(activeSetlist.id, song.id);
+                                    onShowToast(`"${song.title}" removida do setlist.`);
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-all cursor-pointer"
+                                title="Música adicionada. Clique para remover do setlist se desejar."
+                              >
                                 ✓ No Setlist
-                              </span>
+                              </button>
                             ) : (
                               <button
                                 type="button"
                                 onClick={async () => {
                                   await onAddSongToSetlist(activeSetlist.id, song);
-                                  onShowToast(`"${song.title}" adicionada ao setlist!`);
+                                  onShowToast(`"${song.title}" adicionada separadamente ao setlist!`);
                                 }}
                                 className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20"
                               >

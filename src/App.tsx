@@ -94,6 +94,10 @@ export default function App() {
   const [addToSetlistTab, setAddToSetlistTab] = useState<'global' | 'library' | 'new'>('global');
   const [filterLibrarySearch, setFilterLibrarySearch] = useState('');
 
+  // Auth modal overlay state (e.g. from final links, header button, or subscription view)
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register' | 'plans'>('login');
+
   // Drag and Drop reordering state for setlist tracks
   const [draggedSongIndex, setDraggedSongIndex] = useState<number | null>(null);
   const [dragOverSongIndex, setDragOverSongIndex] = useState<number | null>(null);
@@ -257,6 +261,42 @@ export default function App() {
       isMounted = false;
     };
   }, [user]);
+
+  // Listen for final links or URL params/hash to open login/register modal immediately
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash.toLowerCase();
+      const hasAuthParam =
+        urlParams.get('login') === 'true' ||
+        urlParams.get('auth') === 'true' ||
+        urlParams.get('openAuth') === 'true' ||
+        urlParams.get('register') === 'true' ||
+        urlParams.get('action') === 'login' ||
+        urlParams.get('action') === 'register' ||
+        urlParams.get('final') === 'true' ||
+        hash.includes('login') ||
+        hash.includes('auth') ||
+        hash.includes('cadastro') ||
+        hash.includes('criar-conta');
+
+      if (hasAuthParam) {
+        if (
+          urlParams.get('register') === 'true' ||
+          urlParams.get('action') === 'register' ||
+          hash.includes('cadastro') ||
+          hash.includes('criar-conta')
+        ) {
+          setAuthModalMode('register');
+        } else {
+          setAuthModalMode('login');
+        }
+        setShowAuthModal(true);
+      }
+    } catch {
+      // safe fallback
+    }
+  }, []);
 
   // Keep local storage in sync for current user only
   useEffect(() => {
@@ -1007,7 +1047,7 @@ export default function App() {
           <div className="glow glow-2" />
           <div className="grid-background" />
         </div>
-        <AuthModal />
+        <AuthModal initialMode={authModalMode} />
       </>
     );
   }
@@ -1981,18 +2021,22 @@ export default function App() {
           )}
 
           {/* ==================================================== */}
-          {/* PÁGINA: MINHAS GRAVAÇÕES (RECORDINGS) */}
+          {/* PÁGINA: MINHAS GRAVAÇÕES (RECORDINGS) - VARIATION 8 */}
           {/* ==================================================== */}
           {currentPage === 'recordings' && (
-            <section className="page recordings-page space-y-6">
-              <div className="page-title">
+            <section className="page recordings-page space-y-8">
+              <div className="page-title !border-b-0 !pb-0 !mb-0">
                 <div>
-                  <span className="small-label">SUAS PERFORMANCES & GRAVAÇÕES</span>
-                  <h1>Minhas Gravações</h1>
+                  <div className="font-['JetBrains_Mono',monospace] text-[0.68rem] uppercase tracking-[0.16em] text-[#00e5ff] font-semibold mb-1.5">
+                    Performance Management
+                  </div>
+                  <h1 className="font-['Syne',sans-serif] text-3xl sm:text-5xl font-extrabold tracking-tight text-white m-0 leading-none">
+                    Minhas Gravações
+                  </h1>
                 </div>
               </div>
 
-              {/* Estúdio de Gravação & Filmagem com Proteção Anti-Estouro */}
+              {/* Estúdio de Gravação HD (Variation 8 Studio Box) */}
               <MediaRecordingStudio
                 userSongs={allLibrarySongs}
                 userId={user?.uid}
@@ -2000,129 +2044,134 @@ export default function App() {
                 onShowToast={showToast}
               />
 
-              <div className="recordings-list flex flex-col gap-3">
-                <div className="flex items-center justify-between text-xs font-bold text-zinc-400 px-1 pt-2">
+              {/* Seção Histórico de Gravações */}
+              <section className="border-t border-white/10 pt-8">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-400 mb-5 font-['JetBrains_Mono',monospace] tracking-wider">
                   <span>HISTÓRICO DE GRAVAÇÕES ({recordings.length})</span>
-                  <span className="text-[11px] text-zinc-500">Áudios & Filmagens de Alta Fidelidade</span>
+                  <span className="text-[#00e5ff]">ALTA FIDELIDADE</span>
                 </div>
 
                 {recordings.length > 0 ? (
-                  recordings.map((rec) => {
-                    const isVideo =
-                      rec.media_type === 'video' ||
-                      (rec.file_url && rec.file_url.startsWith('data:video'));
-                    const isPlaying = playingRecordingId === rec.id;
+                  <div className="recordings-list flex flex-col gap-3">
+                    {recordings.map((rec) => {
+                      const isVideo =
+                        rec.media_type === 'video' ||
+                        (rec.file_url && rec.file_url.startsWith('data:video'));
+                      const isPlaying = playingRecordingId === rec.id;
 
-                    return (
-                      <div
-                        key={rec.id}
-                        className="recording-card flex items-center gap-3 p-3.5 rounded-2xl bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700/80 flex-wrap sm:flex-nowrap shadow-md transition-all"
-                      >
-                        {/* BOTÃO EXCLUIR */}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRecording(rec.id)}
-                          title="Excluir gravação"
-                          className="delete-front-btn mr-1 shrink-0 cursor-pointer"
+                      return (
+                        <div
+                          key={rec.id}
+                          className="recording-card flex items-center gap-3 p-4 rounded-2xl bg-[#0f172a]/90 border border-white/10 hover:border-[#00e5ff]/50 flex-wrap sm:flex-nowrap shadow-lg transition-all"
                         >
-                          <span>🗑</span>
-                          <span>Excluir</span>
-                        </button>
-
-                        {/* PLAY BUTTON FOR VIDEO OR AUDIO */}
-                        {isVideo ? (
+                          {/* BOTÃO EXCLUIR */}
                           <button
                             type="button"
-                            onClick={() => setActiveVideoModal(rec)}
-                            className="px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shrink-0 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-zinc-950 shadow-md shadow-cyan-500/25"
-                            title="Assistir à Filmagem em Vídeo HD"
+                            onClick={() => handleDeleteRecording(rec.id)}
+                            title="Excluir gravação"
+                            className="delete-front-btn mr-1 shrink-0 cursor-pointer"
                           >
-                            <span className="text-sm">▶</span>
-                            <span>Assistir Filmagem</span>
+                            <span>🗑</span>
+                            <span>Excluir</span>
                           </button>
-                        ) : (
-                          <>
-                            {/* BOTÃO INICIAR (PLAY) */}
+
+                          {/* PLAY BUTTON FOR VIDEO OR AUDIO */}
+                          {isVideo ? (
                             <button
                               type="button"
-                              onClick={() => playRecordingAudio(rec)}
-                              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
-                                isPlaying
-                                  ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/25 ring-2 ring-emerald-400'
-                                  : 'bg-zinc-800 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30'
-                              }`}
-                              title="Iniciar reprodução do áudio gravado"
+                              onClick={() => setActiveVideoModal(rec)}
+                              className="px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shrink-0 bg-gradient-to-r from-[#00e5ff] to-blue-500 hover:from-[#38bdf8] hover:to-blue-400 text-[#020617] shadow-md shadow-[#00e5ff]/25"
+                              title="Assistir à Filmagem em Vídeo HD"
                             >
                               <span className="text-sm">▶</span>
-                              <span>Iniciar</span>
+                              <span>Assistir Filmagem</span>
                             </button>
+                          ) : (
+                            <>
+                              {/* BOTÃO INICIAR (PLAY) */}
+                              <button
+                                type="button"
+                                onClick={() => playRecordingAudio(rec)}
+                                className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                                  isPlaying
+                                    ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/25 ring-2 ring-emerald-400'
+                                    : 'bg-[#020617] hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30'
+                                }`}
+                                title="Iniciar reprodução do áudio gravado"
+                              >
+                                <span className="text-sm">▶</span>
+                                <span>Iniciar</span>
+                              </button>
 
-                            {/* BOTÃO PARAR (STOP) */}
-                            <button
-                              type="button"
-                              onClick={stopRecordingAudio}
-                              disabled={!isPlaying}
-                              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 ${
-                                isPlaying
-                                  ? 'bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/30 cursor-pointer'
-                                  : 'bg-zinc-850 text-zinc-600 border border-zinc-800 cursor-not-allowed opacity-60'
-                              }`}
-                              title="Parar áudio gravado"
-                            >
-                              <span className="text-xs">⏹</span>
-                              <span>Parar</span>
-                            </button>
-                          </>
-                        )}
+                              {/* BOTÃO PARAR (STOP) */}
+                              <button
+                                type="button"
+                                onClick={stopRecordingAudio}
+                                disabled={!isPlaying}
+                                className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 ${
+                                  isPlaying
+                                    ? 'bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-600/30 cursor-pointer'
+                                    : 'bg-[#020617] text-zinc-600 border border-white/5 cursor-not-allowed opacity-50'
+                                }`}
+                                title="Parar áudio gravado"
+                              >
+                                <span className="text-xs">⏹</span>
+                                <span>Parar</span>
+                              </button>
+                            </>
+                          )}
 
-                        {/* DETALHES DO ITEM */}
-                        <div className="flex-1 min-w-[140px]">
-                          <div className="flex items-center gap-2">
-                            <strong className="block text-white text-sm font-semibold truncate">
-                              {rec.song_title}
-                            </strong>
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0 ${
-                                isVideo
-                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                              }`}
-                            >
-                              {isVideo ? '📹 Filmagem HD' : '🎙️ Áudio HD'}
-                            </span>
+                          {/* DETALHES DO ITEM */}
+                          <div className="flex-1 min-w-[140px]">
+                            <div className="flex items-center gap-2">
+                              <strong className="block text-white text-sm font-semibold truncate">
+                                {rec.song_title}
+                              </strong>
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider shrink-0 font-mono ${
+                                  isVideo
+                                    ? 'bg-cyan-500/20 text-[#00e5ff] border border-cyan-500/30'
+                                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                }`}
+                              >
+                                {isVideo ? '📹 Filmagem HD' : '🎙️ Áudio HD'}
+                              </span>
+                            </div>
+                            <small className="text-xs text-slate-400 font-mono">
+                              {Math.round(rec.duration || 0)}s de {isVideo ? 'filmagem' : 'áudio'} • Limitador Dinâmico
+                            </small>
                           </div>
-                          <small className="text-xs text-zinc-400 font-mono">
-                            {Math.round(rec.duration || 0)}s de {isVideo ? 'filmagem' : 'áudio'} • Protegido com Limitador
-                          </small>
-                        </div>
 
-                        {/* BOTÃO DE DOWNLOAD */}
-                        <button
-                          type="button"
-                          onClick={() => downloadRecordingMedia(rec)}
-                          className="px-3 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
-                          title="Baixar gravação para o dispositivo"
-                        >
-                          <span className="text-sm">📥</span>
-                          <span>Baixar {isVideo ? 'Vídeo' : 'Áudio'}</span>
-                        </button>
+                          {/* BOTÃO DE DOWNLOAD */}
+                          <button
+                            type="button"
+                            onClick={() => downloadRecordingMedia(rec)}
+                            className="px-3 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600 text-[#00e5ff] hover:text-white border border-[#00e5ff]/40 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer shrink-0"
+                            title="Baixar gravação para o dispositivo"
+                          >
+                            <span className="text-sm">📥</span>
+                            <span>Baixar {isVideo ? 'Vídeo' : 'Áudio'}</span>
+                          </button>
 
-                        <div className="recording-wave text-cyan-400 font-mono text-xs hidden lg:block">
-                          {isPlaying ? '▅▇▃▂▆▅▃▇▅▃' : '▁▃▆▂▅▇▃▂▆▅'}
+                          <div className="recording-wave text-[#00e5ff] font-mono text-xs hidden lg:block">
+                            {isPlaying ? '▅▇▃▂▆▅▃▇▅▃' : '▁▃▆▂▅▇▃▂▆▅'}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                  </div>
                 ) : (
-                  <div className="empty-state">
-                    <div>🎙️</div>
-                    <h2>Nenhuma gravação realizada ainda</h2>
-                    <p>
-                      Use o <strong>Estúdio de Gravação & Filmagem</strong> acima para registrar sua voz, violão ou filmar seus ensaios com qualidade profissional e sem estourar o som.
+                  <div className="empty-state text-center py-16 px-6 bg-white/[0.02] border border-dashed border-white/10 rounded-2xl max-w-xl mx-auto space-y-3">
+                    <span className="icon text-5xl block opacity-40 mb-2">🎙️</span>
+                    <h3 className="text-base font-bold text-white font-['Syne',sans-serif]">
+                      Nenhuma gravação realizada
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+                      Use o estúdio acima para registrar sua voz ou filmar seus ensaios com qualidade profissional.
                     </p>
                   </div>
                 )}
-              </div>
+              </section>
             </section>
           )}
 
@@ -2255,7 +2304,12 @@ export default function App() {
           {/* ==================================================== */}
           {currentPage === 'plans' && (
             <section className="page overflow-y-auto w-full">
-              <SubscriptionView />
+              <SubscriptionView
+                onOpenAuthModal={() => {
+                  setAuthModalMode('login');
+                  setShowAuthModal(true);
+                }}
+              />
             </section>
           )}
 
@@ -2705,6 +2759,7 @@ export default function App() {
         initialTab={addToSetlistTab}
         onClose={() => setShowAddToSetlistModal(false)}
         onAddSongToSetlist={handleAddSongToSetlist}
+        onRemoveSongFromSetlist={handleRemoveSongFromSetlist}
         onSongSavedToLibrary={(song) => {
           setUserSongs((prev) => [song, ...prev.filter((s) => s.id !== song.id)]);
         }}
@@ -2735,6 +2790,16 @@ export default function App() {
         onDelete={handleDeleteRecording}
         onDownload={downloadRecordingMedia}
       />
+
+      {/* MODAL: TELA DE LOGIN / CRIAR CONTA / PLANOS (ACESSÍVEL VIA LINK FINAL OU BOTÃO) */}
+      {showAuthModal && (
+        <AuthModal
+          initialMode={authModalMode}
+          isModalOverlay
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => setShowAuthModal(false)}
+        />
+      )}
 
       {/* BARRA DE NAVEGAÇÃO INFERIOR PARA CELULARES E TABLETS (MOBILE TAB BAR) */}
       {!activeShowSong && user && (
@@ -2973,7 +3038,7 @@ export default function App() {
                   <span>💎</span>
                   <span>{isPremiumActive ? '👑 Meu Plano PRO (Gerenciar)' : 'Planos Pagos & Pagamento Pix'}</span>
                 </span>
-                <span className="text-[11px] text-amber-400 font-mono">R$ 10/mês →</span>
+                <span className="text-[11px] text-amber-400 font-mono">R$ 9,99/mês →</span>
               </button>
             </div>
 

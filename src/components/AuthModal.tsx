@@ -6,20 +6,66 @@ import { generatePixPayload, generatePixQrDataUrl } from '../utils/pix';
 
 interface AuthModalProps {
   onSuccess?: () => void;
+  onClose?: () => void;
+  initialMode?: 'login' | 'register' | 'reset' | 'plans';
+  isModalOverlay?: boolean;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({
+  onSuccess,
+  onClose,
+  initialMode,
+  isModalOverlay,
+}) => {
   const { login, loginWithGoogle, loginAsGuest, register, resetPassword, activateProSubscription } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'auth' | 'plans'>('auth');
-  const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
-  const [isResetMode, setIsResetMode] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'auth' | 'plans'>(
+    initialMode === 'plans' ? 'plans' : 'auth'
+  );
+  const [isRegisterMode, setIsRegisterMode] = useState<boolean>(initialMode === 'register');
+  const [isResetMode, setIsResetMode] = useState<boolean>(initialMode === 'reset');
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+
+  // Restore saved credentials if previously remembered
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('kolvox_remembered_auth');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.email) setEmail(parsed.email);
+        if (parsed.password) setPassword(parsed.password);
+        setRememberMe(true);
+      }
+    } catch {
+      // safe fallback
+    }
+  }, []);
+
+  // Sync mode if initialMode prop changes
+  useEffect(() => {
+    if (initialMode === 'register') {
+      setActiveTab('auth');
+      setIsRegisterMode(true);
+      setIsResetMode(false);
+    } else if (initialMode === 'plans') {
+      setActiveTab('plans');
+      setIsRegisterMode(false);
+      setIsResetMode(false);
+    } else if (initialMode === 'reset') {
+      setActiveTab('auth');
+      setIsResetMode(true);
+      setIsRegisterMode(false);
+    } else if (initialMode === 'login') {
+      setActiveTab('auth');
+      setIsRegisterMode(false);
+      setIsResetMode(false);
+    }
+  }, [initialMode]);
 
   // Plan selection and Pix
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
@@ -37,7 +83,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
 
   // Generate real Pix QR Code and EMV payload on plan change
   useEffect(() => {
-    const amount = selectedPlan === 'monthly' ? '10.00' : '99.99';
+    const amount = selectedPlan === 'monthly' ? '9.99' : '99.99';
     const payload = generatePixPayload({
       pixKey,
       receiverName: 'KOLVOX TECNOLOGIA LTDA',
@@ -132,6 +178,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
       setLoading(true);
       try {
         await register(name.trim(), email.trim(), password);
+        if (rememberMe) {
+          try {
+            localStorage.setItem('kolvox_remembered_auth', JSON.stringify({ email: email.trim(), password }));
+          } catch {}
+        } else {
+          try {
+            localStorage.removeItem('kolvox_remembered_auth');
+          } catch {}
+        }
         onSuccess?.();
       } catch (err: any) {
         setErrorMessage(err.message || 'Erro ao criar conta. Tente outro e-mail.');
@@ -150,6 +205,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
     setLoading(true);
     try {
       await login(email.trim(), password);
+      if (rememberMe) {
+        try {
+          localStorage.setItem('kolvox_remembered_auth', JSON.stringify({ email: email.trim(), password }));
+        } catch {}
+      } else {
+        try {
+          localStorage.removeItem('kolvox_remembered_auth');
+        } catch {}
+      }
       onSuccess?.();
     } catch (err: any) {
       setErrorMessage(err.message || 'E-mail ou senha incorretos.');
@@ -158,8 +222,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
     }
   };
 
-  return (
-    <section id="loginScreen" className="login-screen">
+  const content = (
+    <section id="loginScreen" className={`login-screen relative ${isModalOverlay ? 'w-full max-w-4xl p-0 my-auto shadow-2xl' : ''}`}>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-3 right-3 z-50 w-9 h-9 rounded-full bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-lg border border-zinc-700 text-sm font-bold"
+          title="Fechar janela de login"
+        >
+          ✕
+        </button>
+      )}
       <div className="login-card">
         {/* Visual da Esquerda com Imagem de Palco Cobrindo o Painel */}
         <div className="login-visual">
@@ -203,7 +277,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                 <span>CONTA DE TESTE GRÁTIS</span>
               </div>
               <p className="text-[11px] text-zinc-300 leading-relaxed">
-                Todas as novas contas possuem <strong>7 dias de acesso liberado</strong> para testar todas as funções. Após os 7 dias, o acesso continua mediante o plano de R$ 10/mês ou R$ 99,99/ano.
+                Todas as novas contas possuem <strong>7 dias de acesso liberado</strong> para testar todas as funções. Após os 7 dias, o acesso continua mediante o plano de R$ 9,99/mês ou R$ 99,99/ano.
               </p>
             </div>
           </div>
@@ -233,7 +307,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                 </p>
               </div>
 
-              {/* Seleção de Planos (R$ 10 mensais e R$ 99,99 anual) */}
+              {/* Seleção de Planos (R$ 9,99 mensais e R$ 99,99 anual) */}
               <div className="grid grid-cols-2 gap-2.5">
                 {/* Mensal */}
                 <button
@@ -246,7 +320,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                   }`}
                 >
                   <div className="text-[10px] uppercase font-bold text-zinc-400">Plano Mensal</div>
-                  <div className="text-lg font-black text-white mt-0.5">R$ 10,00</div>
+                  <div className="text-lg font-black text-white mt-0.5">R$ 9,99</div>
                   <div className="text-[10px] text-zinc-400">cobrança mensal</div>
                 </button>
 
@@ -276,7 +350,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                     <span>⚡</span> Pagamento Instantâneo via Pix
                   </span>
                   <span className="text-xs font-mono font-bold text-white">
-                    {selectedPlan === 'monthly' ? 'R$ 10,00' : 'R$ 99,99'}
+                    {selectedPlan === 'monthly' ? 'R$ 9,99' : 'R$ 99,99'}
                   </span>
                 </div>
 
@@ -287,6 +361,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                       src={pixQrUrl}
                       alt="QR Code Pix Kolvox"
                       className="w-28 h-28 rounded-lg bg-white p-1 shrink-0 shadow-md"
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        if (!target.dataset.triedFallback) {
+                          target.dataset.triedFallback = '1';
+                          target.src = `https://quickchart.io/qr?size=320&text=${encodeURIComponent(pixPayload)}`;
+                        }
+                      }}
                     />
                   ) : (
                     <div className="w-28 h-28 rounded-lg bg-zinc-800 flex items-center justify-center text-xs text-zinc-400 shrink-0">
@@ -408,7 +489,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                 </div>
               )}
 
-              <form id="loginForm" onSubmit={handleSubmit}>
+              <form id="loginForm" onSubmit={handleSubmit} method="post" autoComplete="on">
                 {isRegisterMode && (
                   <>
                     <label htmlFor="nameInput">Nome ou Nome Artístico</label>
@@ -416,6 +497,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                       <span className="icon">👤</span>
                       <input
                         id="nameInput"
+                        name="name"
+                        autoComplete="name"
                         type="text"
                         placeholder="Ex: Rogerio Fernandes"
                         value={name}
@@ -431,6 +514,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                   <span className="icon">✉</span>
                   <input
                     id="emailInput"
+                    name="username"
+                    autoComplete="username"
                     type="email"
                     placeholder="seu.email@exemplo.com"
                     value={email}
@@ -446,6 +531,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                       <span className="icon">🔒</span>
                       <input
                         id="passwordInput"
+                        name="password"
+                        autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
                         type={showPassword ? 'text' : 'password'}
                         placeholder="••••••••"
                         value={password}
@@ -597,4 +684,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
       </div>
     </section>
   );
+
+  if (isModalOverlay) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in">
+        {content}
+      </div>
+    );
+  }
+
+  return content;
 };

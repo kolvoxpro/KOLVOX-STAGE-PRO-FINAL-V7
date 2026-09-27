@@ -136,48 +136,42 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
   };
 
   return (
-    <div className="bg-gradient-to-b from-zinc-900 to-zinc-950 border border-zinc-800 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-6">
+    <div className="bg-[#0f172a] border-2 border-[#00e5ff] rounded-[24px] p-6 sm:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.4)] space-y-6 sm:space-y-7">
       {/* Studio Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-white/10 pb-5">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-bold mb-1 border border-amber-500/20">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>ESTÚDIO DE GRAVAÇÃO & FILMAGEM KOLVOX</span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-            Gravação HD & Filmagem de Palco
+          <h2 className="font-['Syne',sans-serif] text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-none mb-1.5">
+            Estúdio de Gravação HD
           </h2>
-          <p className="text-xs text-zinc-400 mt-0.5">
-            Áudio com limitador dinâmico de estúdio (sem distorção / sem estourar) e modo filmagem com câmera ao vivo.
+          <p className="text-xs sm:text-sm text-slate-400">
+            Captura profissional com limitador dinâmico de estúdio.
           </p>
         </div>
 
-        {/* Mode Selector (Apenas Áudio vs Filmagem com Vídeo) */}
+        {/* Mode Selector (Apenas Áudio vs Filmagem + Áudio) */}
         {!isRecording && (
-          <div className="flex items-center bg-zinc-950 p-1 rounded-2xl border border-zinc-800 self-start sm:self-auto">
+          <div className="flex bg-[#020617] p-1 rounded-xl border border-white/10 self-start sm:self-auto shrink-0">
             <button
               type="button"
               onClick={() => setMode('audio')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 mode === 'audio'
-                  ? 'bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/20'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-[#00e5ff] text-[#020617] font-bold shadow-md shadow-[#00e5ff]/20'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Mic className="w-4 h-4" />
-              <span>Apenas Áudio</span>
+              Apenas Áudio
             </button>
             <button
               type="button"
               onClick={() => setMode('video')}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 mode === 'video'
-                  ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-zinc-950 shadow-md shadow-cyan-400/20'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-[#00e5ff] text-[#020617] font-bold shadow-md shadow-[#00e5ff]/20'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Video className="w-4 h-4" />
-              <span>Filmagem & Áudio</span>
+              Filmagem + Áudio
             </button>
           </div>
         )}
@@ -185,7 +179,7 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
 
       {/* Video Viewfinder Screen (when mode is video) */}
       {mode === 'video' && (
-        <div className="relative rounded-2xl overflow-hidden bg-black border border-zinc-800 aspect-video max-h-[380px] w-full flex items-center justify-center shadow-inner">
+        <div className="relative rounded-2xl overflow-hidden bg-black border border-white/10 aspect-video max-h-[380px] w-full flex items-center justify-center shadow-inner">
           {liveStream ? (
             <video
               ref={videoPreviewRef}
@@ -196,11 +190,11 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
             />
           ) : (
             <div className="text-center p-6 space-y-3">
-              <Camera className="w-12 h-12 text-zinc-600 mx-auto animate-pulse" />
-              <div className="text-sm font-bold text-zinc-300">
+              <Camera className="w-12 h-12 text-slate-600 mx-auto animate-pulse" />
+              <div className="text-sm font-bold text-slate-300">
                 Câmera em Espera
               </div>
-              <p className="text-xs text-zinc-500 max-w-xs mx-auto">
+              <p className="text-xs text-slate-500 max-w-xs mx-auto">
                 A prévia da sua câmera será ativada ao iniciar a filmagem ou você pode testá-la gravando um ensaio.
               </p>
             </div>
@@ -208,7 +202,7 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
 
           {/* Video Overlay Top Badge */}
           {isRecording && (
-            <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-red-500/50 text-red-400 text-xs font-black">
+            <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-red-500/50 text-red-400 text-xs font-black font-mono">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping inline-block" />
               <span>REC • {formatTimer(recordingTime)}</span>
             </div>
@@ -219,10 +213,10 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
             <button
               type="button"
               onClick={switchCamera}
-              className="absolute top-3 right-3 p-2 rounded-xl bg-black/60 hover:bg-black/90 backdrop-blur-md border border-zinc-700 text-zinc-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="absolute top-3 right-3 p-2 rounded-xl bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/10 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Trocar Câmera (Frontal / Traseira)"
             >
-              <SwitchCamera className="w-4 h-4" />
+              <SwitchCamera className="w-4 h-4 text-[#00e5ff]" />
               <span className="hidden sm:inline">
                 {currentFacingMode === 'user' ? 'Câmera Frontal' : 'Câmera Traseira'}
               </span>
@@ -246,55 +240,38 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
       )}
 
       {/* Real-time Studio VU Meter & Anti-Clipping Indicator */}
-      <div className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/80 space-y-2.5">
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-amber-400" />
-            <span className="font-bold text-zinc-200">
-              Nível de Captação do Microfone:
-            </span>
-            <span className="font-mono text-zinc-400">{volumeLevel}%</span>
-          </div>
-
-          {/* Audio Safety Status */}
-          <div className="flex items-center gap-1.5">
-            {isLimiterActive ? (
-              <span className="text-[11px] font-extrabold text-amber-400 flex items-center gap-1 animate-pulse">
-                <Zap className="w-3.5 h-3.5" />
-                <span>Limitador Dinâmico Atuando (Sem Estourar)</span>
-              </span>
-            ) : volumeLevel > 0 ? (
-              <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Nível Perfeito • Protegido Contra Estouro</span>
-              </span>
-            ) : (
-              <span className="text-[11px] text-zinc-500 font-medium">
-                Aguardando sinal de áudio...
-              </span>
-            )}
-          </div>
+      <div className="p-4 sm:p-5 bg-black/30 rounded-2xl border border-white/5 space-y-2">
+        <div className="flex items-center justify-between text-xs font-['JetBrains_Mono',monospace] font-medium">
+          <span className="text-slate-400 tracking-wider">NÍVEL DE ENTRADA</span>
+          <span className="text-[#00e5ff] font-semibold">
+            {isLimiterActive
+              ? '⚡ LIMITADOR DINÂMICO ATIVO (-2dB)'
+              : volumeLevel > 0
+              ? `Captação Ativa: ${volumeLevel}%`
+              : 'Aguardando sinal... 0%'}
+          </span>
         </div>
 
         {/* Visual VU Meter Bar */}
-        <div className="h-3 rounded-full bg-zinc-900 overflow-hidden border border-zinc-800 flex">
+        <div className="h-3 bg-[#020617] rounded-full overflow-hidden border border-white/10 mt-2 flex">
           <div
-            className={`h-full transition-all duration-75 rounded-full ${
-              isLimiterActive
-                ? 'bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500'
-                : 'bg-gradient-to-r from-cyan-500 to-emerald-400'
-            }`}
-            style={{ width: `${Math.max(4, volumeLevel)}%` }}
+            className="h-full rounded-full transition-all duration-75"
+            style={{
+              width: `${Math.max(4, volumeLevel)}%`,
+              background: isLimiterActive
+                ? 'linear-gradient(90deg, #00e5ff, #f59e0b, #ef4444)'
+                : 'linear-gradient(90deg, #00e5ff, #10b981)',
+            }}
           />
         </div>
       </div>
 
       {/* Song Association & Title Input (when idle) */}
       {!isRecording && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div>
-            <label className="block text-zinc-400 font-bold mb-1">
-              Associar a uma Música do seu Acervo (Opcional):
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold text-slate-400">
+              Associar a uma Música:
             </label>
             <select
               value={selectedSongId}
@@ -305,20 +282,20 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
                   setCustomTitle(found.title);
                 }
               }}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white text-xs focus:outline-hidden focus:border-amber-400"
+              className="bg-[#020617] border border-white/10 p-3 rounded-xl text-white text-xs sm:text-sm focus:border-[#00e5ff] focus:outline-hidden transition-colors"
             >
-              <option value="">— Nenhuma música específica (Gravação Livre) —</option>
+              <option value="">— Gravação Livre —</option>
               {userSongs.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.title} • {s.artist}
+                  {s.artist ? `${s.artist} - ${s.title}` : s.title}
                 </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-zinc-400 font-bold mb-1">
-              Título da Gravação:
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold text-slate-400">
+              Título da Performance:
             </label>
             <input
               type="text"
@@ -329,63 +306,48 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
               }
               value={customTitle}
               onChange={(e) => setCustomTitle(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white text-xs placeholder:text-zinc-600 focus:outline-hidden focus:border-amber-400"
+              className="bg-[#020617] border border-white/10 p-3 rounded-xl text-white text-xs sm:text-sm placeholder:text-slate-600 focus:border-[#00e5ff] focus:outline-hidden transition-colors"
             />
           </div>
         </div>
       )}
 
-      {/* Controls Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-        {/* Timer display */}
-        {isRecording ? (
-          <div className="flex items-center gap-3">
-            <div className="w-4 h-4 rounded-full bg-red-500 animate-ping shrink-0" />
-            <div>
-              <div className="text-2xl sm:text-3xl font-mono font-black text-white tracking-wider">
-                {formatTimer(recordingTime)}
-              </div>
-              <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest block">
-                {isPaused
-                  ? 'Gravação Pausada'
-                  : mode === 'video'
-                  ? 'Filmando Vídeo & Captando Áudio HD'
-                  : 'Gravando Áudio Studio HD'}
-              </span>
-            </div>
-          </div>
+      {/* Controls Bar / Action Button */}
+      <div className="pt-2">
+        {!isRecording ? (
+          <button
+            type="button"
+            onClick={handleStart}
+            className="w-full bg-[#00e5ff] hover:bg-[#38bdf8] text-[#020617] p-4 sm:p-5 rounded-xl font-extrabold uppercase tracking-wider text-xs sm:text-sm flex items-center justify-center gap-3 transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_25px_rgba(0,229,255,0.35)] active:translate-y-0 cursor-pointer"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="12" r="8" />
+            </svg>
+            <span>
+              {mode === 'video' ? 'Iniciar Filmagem + Áudio' : 'Iniciar Gravação de Áudio'}
+            </span>
+          </button>
         ) : (
-          <div className="text-xs text-zinc-400">
-            Pressione para iniciar a gravação com qualidade de estúdio e proteção de ganho.
-          </div>
-        )}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Timer display */}
+            <div className="flex items-center gap-3">
+              <div className="w-4 h-4 rounded-full bg-red-500 animate-ping shrink-0" />
+              <div>
+                <div className="text-2xl sm:text-3xl font-['JetBrains_Mono',monospace] font-black text-white tracking-wider">
+                  {formatTimer(recordingTime)}
+                </div>
+                <span className="text-[11px] font-bold text-red-400 uppercase tracking-widest block font-mono">
+                  {isPaused
+                    ? 'Gravação Pausada'
+                    : mode === 'video'
+                    ? 'Filmando Vídeo & Captando Áudio HD'
+                    : 'Gravando Áudio Studio HD'}
+                </span>
+              </div>
+            </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
-          {!isRecording ? (
-            <button
-              type="button"
-              onClick={handleStart}
-              className={`w-full sm:w-auto px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer hover:scale-102 active:scale-98 ${
-                mode === 'video'
-                  ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 text-zinc-950 shadow-cyan-500/25'
-                  : 'bg-gradient-to-r from-amber-400 to-orange-500 text-zinc-950 shadow-amber-500/25'
-              }`}
-            >
-              {mode === 'video' ? (
-                <>
-                  <Video className="w-4 h-4" />
-                  <span>INICIAR FILMAGEM & CAPTAÇÃO</span>
-                </>
-              ) : (
-                <>
-                  <Mic className="w-4 h-4" />
-                  <span>INICIAR GRAVAÇÃO DE ÁUDIO</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <>
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2.5 w-full sm:w-auto">
               {/* Pause / Resume */}
               <button
                 type="button"
@@ -394,7 +356,7 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
               >
                 {isPaused ? (
                   <>
-                    <Play className="w-4 h-4 fill-current text-amber-400" />
+                    <Play className="w-4 h-4 fill-current text-[#00e5ff]" />
                     <span>Retomar</span>
                   </>
                 ) : (
@@ -429,14 +391,14 @@ export const MediaRecordingStudio: React.FC<MediaRecordingStudioProps> = ({
               <button
                 type="button"
                 onClick={cancelRecording}
-                className="p-3 rounded-xl bg-zinc-800 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 transition-colors"
+                className="p-3 rounded-xl bg-zinc-800 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
                 title="Descartar gravação atual"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (

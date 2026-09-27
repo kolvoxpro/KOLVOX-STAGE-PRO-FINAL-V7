@@ -150,7 +150,7 @@ export function adminGrantCustomerPlan(
   planType: 'kolvox_pro_monthly' | 'kolvox_pro_yearly' = 'kolvox_pro_yearly'
 ): void {
   const uid = String(targetUserId);
-  const planLabel = planType === 'kolvox_pro_yearly' ? 'Plano Anual (R$ 99,99/ano)' : 'Plano Mensal (R$ 10,00/mês)';
+  const planLabel = planType === 'kolvox_pro_yearly' ? 'Plano Anual (R$ 99,99/ano)' : 'Plano Mensal (R$ 9,99/mês)';
 
   const sub = {
     id: Date.now(),

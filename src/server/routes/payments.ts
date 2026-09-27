@@ -21,15 +21,15 @@ router.post('/pix-charge', requireAuth, async (req: AuthRequest, res: Response) 
     const receiverName = settings?.pixReceiverName?.trim() || 'KOLVOX STAGE';
     const city = settings?.pixCity?.trim() || 'SAO PAULO';
 
-    let amount = 10.0;
-    const baseMonthly = settings?.monthlyPrice ? parseFloat(settings.monthlyPrice) : 10.0;
+    let amount = 9.99;
+    const baseMonthly = settings?.monthlyPrice ? parseFloat(settings.monthlyPrice) : 9.99;
     if (plan === 'kolvox_pro_yearly') {
       amount = 99.99;
     } else {
-      amount = isNaN(baseMonthly) ? 10.0 : baseMonthly;
+      amount = isNaN(baseMonthly) || baseMonthly === 10 ? 9.99 : baseMonthly;
     }
 
-    if (isNaN(amount) || amount <= 0) amount = 10.0;
+    if (isNaN(amount) || amount <= 0) amount = 9.99;
 
     // Unique charge reference ID (TxID)
     const chargeId = `KVX${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -323,7 +323,7 @@ router.post('/pix-manual', requireAuth, async (req: AuthRequest, res: Response) 
 
     // Get current configured price
     const [settings] = await db.select().from(schema.appSettings).limit(1);
-    const finalAmount = amount ? String(amount) : (settings?.monthlyPrice || '10.00');
+    const finalAmount = amount ? String(amount) : (settings?.monthlyPrice && settings.monthlyPrice !== '10.00' ? settings.monthlyPrice : '9.99');
 
     const externalId = referenceCode?.trim() || `MANUAL-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
@@ -662,7 +662,7 @@ router.post('/webhook', async (req, res: Response) => {
                 subscriptionStart: now,
                 subscriptionEnd: nextEnd,
                 paymentProvider: 'PIX_GATEWAY',
-                amount: paymentAmount || '10.00',
+                amount: paymentAmount || '9.99',
               });
             }
 
@@ -681,7 +681,7 @@ router.post('/webhook', async (req, res: Response) => {
                   userEmail: targetUser.email,
                   userName: targetUser.displayName || undefined,
                   planName,
-                  amount: paymentAmount || '10.00',
+                  amount: paymentAmount || '9.99',
                   referenceCode: String(paymentRef),
                 }).catch(err => console.warn('Email dispatch warning in webhook:', err));
               }
@@ -734,7 +734,7 @@ router.post('/instant-unlock', requireAuth, async (req: AuthRequest, res: Respon
         subscriptionStart: now,
         subscriptionEnd: nextEnd,
         paymentProvider: 'PIX_INSTANT',
-        amount: isYearly ? '99.99' : '10.00',
+        amount: isYearly ? '99.99' : '9.99',
       });
     }
 

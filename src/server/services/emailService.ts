@@ -206,10 +206,13 @@ export async function notifyPaymentApprovedAndProActivated(params: {
   referenceCode?: string;
 }) {
   const isYearly = params.planName.includes('yearly');
-  const formattedPlan = isYearly ? 'Plano Anual PRO (R$ 99,99/ano)' : 'Plano Mensal PRO (R$ 10,00/mês)';
+  const formattedPlan = isYearly ? 'Plano Anual PRO (R$ 99,99/ano)' : 'Plano Mensal PRO (R$ 9,99/mês)';
   const subject = `[KOLVOX STAGE] Pagamento Reconhecido! Seu Plano PRO foi Ativado com Sucesso`;
 
-  const text = `Olá, ${params.userName || 'Artista'}!\n\nSeu pagamento Pix no valor de R$ ${params.amount} foi reconhecido com sucesso pelo banco e confirmado no sistema.\n\nSua conta vinculada (${params.userEmail}) agora possui acesso ilimitado ao KOLVOX PRO!\n\nDetalhes da Ativação:\n- Plano: ${formattedPlan}\n- E-mail da Conta: ${params.userEmail}\n- Código/Ref: ${params.referenceCode || 'PIX-CONFIRMADO'}\n- Status: Liberado e Ativo\n\nTodos os recursos de palco, setlists, letras e modo show estão 100% liberados.\n\nBom show!\nEquipe KOLVOX STAGE\nkolvox.pagamentos@gmail.com`;
+  const appBaseUrl = process.env.APP_URL || 'https://ais-dev-s7p42qu2vbby4emgjfhtig-855002600123.us-east1.run.app';
+  const loginActionUrl = `${appBaseUrl}/?action=login&openAuth=true#login`;
+
+  const text = `Olá, ${params.userName || 'Artista'}!\n\nSeu pagamento Pix no valor de R$ ${params.amount} foi reconhecido com sucesso pelo banco e confirmado no sistema.\n\nSua conta vinculada (${params.userEmail}) agora possui acesso ilimitado ao KOLVOX PRO!\n\nDetalhes da Ativação:\n- Plano: ${formattedPlan}\n- E-mail da Conta: ${params.userEmail}\n- Código/Ref: ${params.referenceCode || 'PIX-CONFIRMADO'}\n- Status: Liberado e Ativo\n\nClique no link abaixo para criar sua conta ou fazer login direto no aplicativo:\n${loginActionUrl}\n\nTodos os recursos de palco, setlists, letras e modo show estão 100% liberados.\n\nBom show!\nEquipe KOLVOX STAGE\nkolvox.pagamentos@gmail.com`;
 
   const html = `
     <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #09090b; color: #f4f4f5; border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 20px; padding: 32px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
@@ -261,8 +264,8 @@ export async function notifyPaymentApprovedAndProActivated(params: {
       </p>
 
       <div style="text-align: center; margin: 28px 0 16px 0;">
-        <a href="https://ais-dev-xxmpxqlkxk5xj73nvrm47l-377929602639.us-east1.run.app" style="background: #00e5ff; color: #09090b; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block;">
-          Abrir KOLVOX STAGE
+        <a href="${loginActionUrl}" style="background: #00e5ff; color: #09090b; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block;">
+          Fazer Login / Criar Conta no KOLVOX STAGE
         </a>
       </div>
 

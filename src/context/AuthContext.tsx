@@ -667,7 +667,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const activateProSubscription = async (plan: 'kolvox_pro_monthly' | 'kolvox_pro_yearly' = 'kolvox_pro_monthly', refCode?: string) => {
     if (!user) return;
-    const planName = plan === 'kolvox_pro_yearly' ? 'Plano Anual (R$ 99,99/ano)' : 'Plano Mensal (R$ 10,00/mês)';
+    const planName = plan === 'kolvox_pro_yearly' ? 'Plano Anual (R$ 99,99/ano)' : 'Plano Mensal (R$ 9,99/mês)';
     const subData = {
       id: Date.now(),
       isPremium: true,
@@ -740,7 +740,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: Date.now(),
       isPremium: true,
       plan: planType,
-      planType: planType === 'kolvox_pro_yearly' ? 'Plano Anual (R$ 99,99/ano)' : 'Plano Mensal (R$ 10,00/mês)',
+      planType: planType === 'kolvox_pro_yearly' ? 'Plano Anual (R$ 99,99/ano)' : 'Plano Mensal (R$ 9,99/mês)',
       status: 'active',
       referenceCode: `ADM-LIB-${Date.now().toString().slice(-6)}`,
       activatedAt: new Date().toISOString(),

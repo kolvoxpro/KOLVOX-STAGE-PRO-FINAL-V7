@@ -121,7 +121,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
 
   // General Settings
   const [supportEmail, setSupportEmail] = useState('kolvox.pagamentos@gmail.com');
-  const [monthlyPrice, setMonthlyPrice] = useState('10.00');
+  const [monthlyPrice, setMonthlyPrice] = useState('9.99');
   const [trialDays, setTrialDays] = useState(7);
   const [pixEnabled, setPixEnabled] = useState(true);
   const [manualPaymentEnabled, setManualPaymentEnabled] = useState(true);
@@ -135,10 +135,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
   const [gmailEmail, setGmailEmail] = useState<string | null>(() => {
     return localStorage.getItem('kolvox_gmail_connected_account') || 'koljoseph2020@gmail.com';
   });
-  const [gmailAppPassword, setGmailAppPassword] = useState('');
+  const [gmailAppPassword, setGmailAppPassword] = useState(() => {
+    return localStorage.getItem('kolvox_gmail_app_password') || '';
+  });
   const [testRecipientEmail, setTestRecipientEmail] = useState('');
   const [hasCredentials, setHasCredentials] = useState<boolean>(() => {
-    return localStorage.getItem('kolvox_gmail_status') === 'connected';
+    return localStorage.getItem('kolvox_gmail_status') === 'connected' || Boolean(localStorage.getItem('kolvox_gmail_app_password'));
   });
   const [testingGmail, setTestingGmail] = useState(false);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
@@ -443,7 +445,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
           setPixReceiverName(data.settings.pixReceiverName || '');
           setPixCity(data.settings.pixCity || '');
           setSupportEmail(data.settings.supportEmail || '');
-          setMonthlyPrice(data.settings.monthlyPrice || '10.00');
+          const loadedPrice = data.settings.monthlyPrice;
+          setMonthlyPrice(loadedPrice && loadedPrice !== '10.00' && loadedPrice !== '10' ? loadedPrice : '9.99');
           setTrialDays(data.settings.trialDays || 7);
           setPixEnabled(data.settings.pixEnabled ?? true);
           setManualPaymentEnabled(data.settings.manualPaymentEnabled ?? true);
@@ -626,6 +629,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
   const handleConnectGmail = async () => {
     try {
       const emailToUse = (gmailEmail || supportEmail || 'kolvox.pagamentos@gmail.com').trim();
+      const passToUse = (gmailAppPassword || localStorage.getItem('kolvox_gmail_app_password') || '').trim();
+
+      if (passToUse) {
+        localStorage.setItem('kolvox_gmail_app_password', passToUse);
+        setGmailAppPassword(passToUse);
+      }
+
       const res = await fetch('/api/settings/admin/gmail/connect', {
         method: 'POST',
         headers: {
@@ -634,7 +644,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
         },
         body: JSON.stringify({
           email: emailToUse,
-          appPassword: gmailAppPassword.trim(),
+          appPassword: passToUse,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -644,8 +654,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
         setHasCredentials(true);
         localStorage.setItem('kolvox_gmail_status', 'connected');
         localStorage.setItem('kolvox_gmail_connected_account', data.email || emailToUse);
-        setGmailNotice('🟢 Configuração do Gmail salva e ativa com sucesso!');
-        setGmailAppPassword('');
+        setGmailNotice('🟢 Senha salva com sucesso e conexão com Gmail ativada! Você não precisará digitá-la novamente.');
         fetchAdminData();
       } else {
         // Fallback local persistence
@@ -654,16 +663,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
         setHasCredentials(true);
         localStorage.setItem('kolvox_gmail_status', 'connected');
         localStorage.setItem('kolvox_gmail_connected_account', emailToUse);
-        setGmailNotice('🟢 Configuração do Gmail salva e ativa localmente!');
+        setGmailNotice('🟢 Senha salva localmente com sucesso! Você não precisará digitá-la novamente.');
       }
     } catch (err) {
       const emailToUse = (gmailEmail || supportEmail || 'kolvox.pagamentos@gmail.com').trim();
+      const passToUse = (gmailAppPassword || localStorage.getItem('kolvox_gmail_app_password') || '').trim();
+      if (passToUse) {
+        localStorage.setItem('kolvox_gmail_app_password', passToUse);
+      }
       setGmailStatus('connected');
       setGmailEmail(emailToUse);
       setHasCredentials(true);
       localStorage.setItem('kolvox_gmail_status', 'connected');
       localStorage.setItem('kolvox_gmail_connected_account', emailToUse);
-      setGmailNotice('🟢 Configuração do Gmail salva e ativada com sucesso!');
+      setGmailNotice('🟢 Senha salva localmente! Você não precisará digitá-la novamente.');
     }
   };
 
@@ -671,9 +684,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
     try {
       setGmailStatus('disconnected');
       setHasCredentials(false);
+      setGmailAppPassword('');
       localStorage.setItem('kolvox_gmail_status', 'disconnected');
       localStorage.removeItem('kolvox_gmail_connected_account');
       localStorage.removeItem('kolvox_gmail_auth_type');
+      localStorage.removeItem('kolvox_gmail_app_password');
       setGmailNotice('⚪ Conta do Google desconectada.');
       setAdminToastNotice('Conta do Google desconectada.');
       setTimeout(() => setAdminToastNotice(null), 3000);
@@ -692,6 +707,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
     setTestingGmail(true);
     setGmailNotice(null);
     const recipient = (testRecipientEmail || gmailEmail || supportEmail || user?.email || 'kolvox.pagamentos@gmail.com').trim();
+    const passToUse = (gmailAppPassword || localStorage.getItem('kolvox_gmail_app_password') || '').trim();
     try {
       const res = await fetch('/api/settings/admin/gmail/test', {
         method: 'POST',
@@ -701,7 +717,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
         },
         body: JSON.stringify({
           targetEmail: recipient,
-          appPassword: gmailAppPassword ? gmailAppPassword.trim() : undefined,
+          appPassword: passToUse || undefined,
           email: gmailEmail || supportEmail || 'kolvox.pagamentos@gmail.com',
         }),
       });
@@ -2849,6 +2865,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                <span>Valor do Plano Mensal (R$)</span>
+                <span className="text-amber-400 font-mono text-[11px] font-bold">R$ {monthlyPrice}/mês</span>
+              </label>
+              <input
+                id="input-pix-monthly-price-form"
+                type="text"
+                required
+                value={monthlyPrice}
+                onChange={(e) => setMonthlyPrice(e.target.value)}
+                placeholder="9.99"
+                className="w-full bg-zinc-950 border border-zinc-800 focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-hidden transition-colors"
+              />
+              <span className="text-[11px] text-zinc-400 mt-1 block">
+                Valor mensal atualizado para <strong>R$ {monthlyPrice}</strong> (alterado de R$ 10,00 para R$ 9,99).
+              </span>
+            </div>
+
             <div className="pt-2">
               <button
                 id="btn-save-pix-configuration"
@@ -3438,26 +3473,45 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
 
               {/* App Password input */}
               <div className="pt-2">
-                <label className="block text-zinc-300 text-xs font-semibold mb-1.5">
-                  2. Senha de App do Google (16 caracteres sem espaços):
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-zinc-300 text-xs font-semibold">
+                    2. Senha de App do Google (16 caracteres sem espaços):
+                  </label>
+                  {(gmailAppPassword || localStorage.getItem('kolvox_gmail_app_password')) && (
+                    <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1 font-mono">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Senha salva e persistida</span>
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="password"
                     value={gmailAppPassword}
-                    onChange={(e) => setGmailAppPassword(e.target.value)}
-                    placeholder={hasCredentials ? '•••••••••••••••• (Senha salva no sistema)' : 'ex: abcd efgh ijkl mnop'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setGmailAppPassword(val);
+                      if (val.trim()) {
+                        localStorage.setItem('kolvox_gmail_app_password', val.trim());
+                      }
+                    }}
+                    placeholder={hasCredentials || localStorage.getItem('kolvox_gmail_app_password') ? '•••••••••••••••• (Senha salva no sistema)' : 'ex: abcd efgh ijkl mnop'}
                     className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-700 text-white text-xs focus:outline-none focus:border-sky-500 font-mono tracking-wider"
                   />
                   <button
                     type="button"
                     onClick={handleConnectGmail}
-                    className="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shrink-0 transition-all border border-zinc-700"
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shrink-0 transition-all shadow-sm"
                   >
-                    <Key className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Salvar Senha</span>
+                    <Key className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Salvar Senha Definitiva</span>
                   </button>
                 </div>
+                <p className="text-[11px] text-zinc-400 mt-1.5">
+                  {(gmailAppPassword || localStorage.getItem('kolvox_gmail_app_password'))
+                    ? '🟢 A senha está gravada e não precisará ser digitada novamente.'
+                    : 'Insira a senha de 16 letras gerada na sua conta Google e clique em Salvar para fixá-la.'}
+                </p>
               </div>
             </div>
 

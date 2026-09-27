@@ -59,8 +59,8 @@ router.post('/checkout', requireAuth, async (req: AuthRequest, res: Response) =>
     const { plan, paymentMethod, cardDetails } = req.body;
 
     const amountMap: Record<string, string> = {
-      kolvox_pro_monthly: '19.90',
-      kolvox_pro_yearly: '179.90',
+      kolvox_pro_monthly: '9.99',
+      kolvox_pro_yearly: '99.99',
     };
 
     const durationDaysMap: Record<string, number> = {
@@ -68,7 +68,7 @@ router.post('/checkout', requireAuth, async (req: AuthRequest, res: Response) =>
       kolvox_pro_yearly: 365,
     };
 
-    const amount = amountMap[plan] || '19.90';
+    const amount = amountMap[plan] || '9.99';
     const durationDays = durationDaysMap[plan] || 30;
 
     const now = new Date();
