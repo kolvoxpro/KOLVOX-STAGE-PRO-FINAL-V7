@@ -490,22 +490,22 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                   {songsCount > 0 && (
                     <button
                       id="btn-start-show-stage"
                       onClick={() => onStartStageWithPlaylist(activePlaylist, 0)}
-                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-zinc-950 font-extrabold text-xs shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all active:scale-95"
+                      className="flex-1 sm:flex-initial justify-center px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-zinc-950 font-extrabold text-xs shadow-lg shadow-amber-500/20 flex items-center gap-2 transition-all active:scale-95 text-center"
                     >
-                      <Play className="w-4 h-4 fill-current" />
-                      <span>INICIAR SHOW NO MODO PALCO</span>
+                      <Play className="w-4 h-4 fill-current shrink-0" />
+                      <span>INICIAR SHOW NO PALCO</span>
                     </button>
                   )}
 
                   <button
                     id="btn-delete-playlist"
                     onClick={() => handleDeletePlaylistDirect(activePlaylist)}
-                    className="px-3 py-2.5 rounded-xl bg-red-950/80 hover:bg-red-900 text-red-300 hover:text-white border border-red-700/80 flex items-center gap-1.5 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+                    className="px-3 py-2.5 rounded-xl bg-red-950/80 hover:bg-red-900 text-red-300 hover:text-white border border-red-700/80 flex items-center justify-center gap-1.5 text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
                     title="Excluir repertório imediatamente"
                   >
                     <Trash2 className="w-4 h-4 shrink-0" />

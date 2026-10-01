@@ -158,6 +158,47 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     }
   };
 
+  const handleBatchDeleteSongs = async () => {
+    if (songs.length === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir todas as ${songs.length} músicas do seu repertório pessoal?`)) return;
+    try {
+      if (user) {
+        await Promise.allSettled(songs.map((s) => deleteSongFromLibrary(user.uid, s.id)));
+      }
+      setSongs([]);
+    } catch (err) {
+      console.error('Failed to batch delete songs:', err);
+    }
+  };
+
+  const handleBatchDeletePlaylists = async () => {
+    if (playlists.length === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir todas as ${playlists.length} setlists?`)) return;
+    try {
+      if (user) {
+        await Promise.allSettled(playlists.map((p) => deletePlaylist(user.uid, p.id)));
+      }
+      setPlaylists([]);
+      setSelectedPlaylist(null);
+      setPlaylistItems([]);
+    } catch (err) {
+      console.error('Failed to batch delete playlists:', err);
+    }
+  };
+
+  const handleBatchDeleteRecordings = async () => {
+    if (recordings.length === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir todas as ${recordings.length} gravações de áudio?`)) return;
+    try {
+      if (user) {
+        await Promise.allSettled(recordings.map((r) => deleteRecording(user.uid, r.id)));
+      }
+      setRecordings([]);
+    } catch (err) {
+      console.error('Failed to batch delete recordings:', err);
+    }
+  };
+
   const handleAddSongToExistingPlaylist = async (pl: Playlist) => {
     if (!user || !songToAddToPlaylist) return;
     try {
@@ -179,60 +220,120 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">
       {/* Header with Navigation Pills */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900 border border-zinc-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl">
         <div>
           <span className="text-xs font-bold text-amber-500 uppercase tracking-widest block mb-1">
             Meu Acervo Pessoal
           </span>
-          <h2 className="text-2xl font-black text-white tracking-tight">Biblioteca & Setlists</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Biblioteca & Setlists</h2>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-2xl p-1.5 gap-1">
-          <button
-            id="kolvox-tab-songs"
-            onClick={() => {
-              setActiveTab('songs');
-              setSelectedPlaylist(null);
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-wide transition-all ${
-              activeTab === 'songs' && !selectedPlaylist
-                ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Music className="w-3.5 h-3.5" />
-            Músicas ({songs.length})
-          </button>
+        {/* Tab Switcher with integrated Excluir buttons */}
+        <div className="flex items-center flex-wrap bg-zinc-950 border border-zinc-800 rounded-2xl p-1.5 gap-1.5 sm:gap-2 w-full sm:w-auto">
+          {/* ABA 1: MÚSICAS */}
+          <div className={`flex items-center rounded-xl p-0.5 transition-all border ${
+            activeTab === 'songs' && !selectedPlaylist
+              ? 'bg-amber-500/20 border-amber-500/50'
+              : 'bg-zinc-900/60 border-zinc-800'
+          }`}>
+            <button
+              id="kolvox-tab-songs"
+              type="button"
+              onClick={() => {
+                setActiveTab('songs');
+                setSelectedPlaylist(null);
+              }}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${
+                activeTab === 'songs' && !selectedPlaylist
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Music className="w-3.5 h-3.5" />
+              <span>Músicas ({songs.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBatchDeleteSongs();
+              }}
+              className="px-2 py-1.5 rounded-lg hover:bg-rose-500/20 text-zinc-500 hover:text-rose-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0"
+              title="Excluir todas as músicas da biblioteca"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span className="text-[11px] hidden sm:inline">Excluir</span>
+            </button>
+          </div>
 
-          <button
-            id="kolvox-tab-playlists"
-            onClick={() => setActiveTab('playlists')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-wide transition-all ${
-              activeTab === 'playlists' || selectedPlaylist
-                ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <ListMusic className="w-3.5 h-3.5" />
-            Setlists ({playlists.length})
-          </button>
+          {/* ABA 2: SETLISTS */}
+          <div className={`flex items-center rounded-xl p-0.5 transition-all border ${
+            activeTab === 'playlists' || selectedPlaylist
+              ? 'bg-amber-500/20 border-amber-500/50'
+              : 'bg-zinc-900/60 border-zinc-800'
+          }`}>
+            <button
+              id="kolvox-tab-playlists"
+              type="button"
+              onClick={() => setActiveTab('playlists')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${
+                activeTab === 'playlists' || selectedPlaylist
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <ListMusic className="w-3.5 h-3.5" />
+              <span>Setlists ({playlists.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBatchDeletePlaylists();
+              }}
+              className="px-2 py-1.5 rounded-lg hover:bg-rose-500/20 text-zinc-500 hover:text-rose-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0"
+              title="Excluir todas as setlists"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span className="text-[11px] hidden sm:inline">Excluir</span>
+            </button>
+          </div>
 
-          <button
-            id="kolvox-tab-recordings"
-            onClick={() => {
-              setActiveTab('recordings');
-              setSelectedPlaylist(null);
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-wide transition-all ${
-              activeTab === 'recordings'
-                ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
-                : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Mic className="w-3.5 h-3.5" />
-            Gravações ({recordings.length})
-          </button>
+          {/* ABA 3: GRAVAÇÕES */}
+          <div className={`flex items-center rounded-xl p-0.5 transition-all border ${
+            activeTab === 'recordings'
+              ? 'bg-amber-500/20 border-amber-500/50'
+              : 'bg-zinc-900/60 border-zinc-800'
+          }`}>
+            <button
+              id="kolvox-tab-recordings"
+              type="button"
+              onClick={() => {
+                setActiveTab('recordings');
+                setSelectedPlaylist(null);
+              }}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all cursor-pointer ${
+                activeTab === 'recordings'
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Mic className="w-3.5 h-3.5" />
+              <span>Gravações ({recordings.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBatchDeleteRecordings();
+              }}
+              className="px-2 py-1.5 rounded-lg hover:bg-rose-500/20 text-zinc-500 hover:text-rose-300 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0"
+              title="Excluir todas as gravações de áudio"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span className="text-[11px] hidden sm:inline">Excluir</span>
+            </button>
+          </div>
         </div>
       </div>
 

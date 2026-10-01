@@ -1028,6 +1028,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
     }
   };
 
+  const handleDeleteSearchDirect = (searchId: number | string) => {
+    setSearchesList((prev) => prev.filter((item) => (item?.search?.id || item?.id) !== searchId));
+    setAdminToastNotice('Registro de pesquisa excluído.');
+    setTimeout(() => setAdminToastNotice(null), 3000);
+  };
+
+  const handleClearAllSearches = () => {
+    if (!confirm('Deseja limpar todo o histórico de buscas registradas?')) return;
+    setSearchesList([]);
+    setAdminToastNotice('Histórico de buscas limpo com sucesso.');
+    setTimeout(() => setAdminToastNotice(null), 3000);
+  };
+
   const handleConfirmDeleteUser = async () => {
     if (!userToDelete) return;
     setIsActionDeleting(true);
@@ -1532,17 +1545,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
         <div className="space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {/* 1. Total de usuários */}
-            <div className="bg-[#0b162b] border border-sky-500/30 shadow-lg shadow-sky-950/20 hover:border-sky-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('users');
+                setUserPlanFilter('all');
+              }}
+              className="bg-[#0b162b] border border-sky-500/30 shadow-lg shadow-sky-950/20 hover:border-sky-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Ver todos os clientes"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>TOTAL USUÁRIOS</span>
                 <Users className="w-4 h-4 text-sky-400" />
               </div>
               <div className="text-2xl font-black text-white font-mono">{metrics?.totalUsers || usersList.length}</div>
-              <div className="text-xs text-zinc-300 mt-1">Cadastrados na plataforma</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Cadastrados na plataforma →</div>
+            </button>
 
             {/* 2. Usuários ativos */}
-            <div className="bg-[#0b162b] border border-emerald-500/30 shadow-lg shadow-emerald-950/20 hover:border-emerald-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('users');
+                setUserPlanFilter('all');
+              }}
+              className="bg-[#0b162b] border border-emerald-500/30 shadow-lg shadow-emerald-950/20 hover:border-emerald-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Ver usuários com acesso ativo"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>USUÁRIOS ATIVOS</span>
                 <UserCheck className="w-4 h-4 text-emerald-400" />
@@ -1550,11 +1579,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-emerald-300 font-mono">
                 {metrics?.activeUsers || usersList.filter((u) => u.status === 'ativo').length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Contas com acesso liberado</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Contas com acesso liberado →</div>
+            </button>
 
             {/* 3. Usuários bloqueados */}
-            <div className="bg-[#0b162b] border border-rose-500/30 shadow-lg shadow-rose-950/20 hover:border-rose-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('users');
+                setUserPlanFilter('all');
+              }}
+              className="bg-[#0b162b] border border-rose-500/30 shadow-lg shadow-rose-950/20 hover:border-rose-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Ver usuários bloqueados"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>BLOQUEADOS</span>
                 <UserX className="w-4 h-4 text-rose-400" />
@@ -1562,11 +1599,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-rose-300 font-mono">
                 {metrics?.blockedUsers || usersList.filter((u) => u.status === 'inativo').length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Contas desativadas</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Contas desativadas →</div>
+            </button>
 
             {/* 4. Novos usuários */}
-            <div className="bg-[#0b162b] border border-purple-500/30 shadow-lg shadow-purple-950/20 hover:border-purple-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('users');
+                setUserPlanFilter('all');
+              }}
+              className="bg-[#0b162b] border border-purple-500/30 shadow-lg shadow-purple-950/20 hover:border-purple-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Ver novos clientes"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>NOVOS USUÁRIOS</span>
                 <Sparkles className="w-4 h-4 text-purple-400" />
@@ -1574,11 +1619,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-purple-300 font-mono">
                 {metrics?.newUsers || usersList.length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Últimos 30 dias</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Últimos 30 dias →</div>
+            </button>
 
             {/* 5. Testes gratuitos ativos */}
-            <div className="bg-[#0b162b] border border-amber-500/30 shadow-lg shadow-amber-950/20 hover:border-amber-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('users');
+                setUserPlanFilter('trial');
+              }}
+              className="bg-[#0b162b] border border-amber-500/30 shadow-lg shadow-amber-950/20 hover:border-amber-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Filtrar clientes em teste de 7 dias"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>TRIAL ATIVO</span>
                 <Clock className="w-4 h-4 text-amber-400" />
@@ -1586,11 +1639,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-amber-300 font-mono">
                 {metrics?.activeTrials ?? subsList.filter((s) => s.subscription?.status === 'trial').length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">7 dias de degustação</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">7 dias de degustação →</div>
+            </button>
 
             {/* 6. Testes expirados */}
-            <div className="bg-[#0b162b] border border-zinc-700/60 shadow-lg hover:border-zinc-500/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('users');
+                setUserPlanFilter('expired');
+              }}
+              className="bg-[#0b162b] border border-zinc-700/60 shadow-lg hover:border-zinc-500 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Filtrar clientes com teste expirado"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>TRIAL EXPIRADO</span>
                 <Clock className="w-4 h-4 text-zinc-400" />
@@ -1598,11 +1659,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-zinc-300 font-mono">
                 {metrics?.expiredTrials ?? subsList.filter((s) => s.subscription?.status === 'expired').length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Prazo de teste encerrado</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Prazo de teste encerrado →</div>
+            </button>
 
             {/* 7. Assinaturas ativas */}
-            <div className="bg-[#0b162b] border border-amber-500/40 shadow-lg shadow-amber-950/20 hover:border-amber-300 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('users');
+                setUserPlanFilter('pro');
+              }}
+              className="bg-[#0b162b] border border-amber-500/40 shadow-lg shadow-amber-950/20 hover:border-amber-300 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Filtrar assinantes PRO ativos"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>ASSINATURAS ATIVAS</span>
                 <Zap className="w-4 h-4 text-amber-400" />
@@ -1610,11 +1679,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-amber-300 font-mono">
                 {metrics?.activeSubs ?? subsList.filter((s) => s.subscription?.status === 'active').length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Membros PRO mensais</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Membros PRO mensais →</div>
+            </button>
 
             {/* 8. Assinaturas canceladas */}
-            <div className="bg-[#0b162b] border border-zinc-700/60 shadow-lg hover:border-zinc-500/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('users');
+                setUserPlanFilter('expired');
+              }}
+              className="bg-[#0b162b] border border-zinc-700/60 shadow-lg hover:border-zinc-500 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Ver assinaturas encerradas"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>CANCELADAS</span>
                 <X className="w-4 h-4 text-zinc-400" />
@@ -1622,11 +1699,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-zinc-300 font-mono">
                 {metrics?.canceledSubs ?? subsList.filter((s) => s.subscription?.status === 'canceled').length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Assinaturas encerradas</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Assinaturas encerradas →</div>
+            </button>
 
             {/* 9. Pagamentos aprovados */}
-            <div className="bg-[#0b162b] border border-emerald-500/30 shadow-lg shadow-emerald-950/20 hover:border-emerald-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('payments');
+              }}
+              className="bg-[#0b162b] border border-emerald-500/30 shadow-lg shadow-emerald-950/20 hover:border-emerald-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Ver pagamentos aprovados"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>PAGAMENTOS APROVADOS</span>
                 <Check className="w-4 h-4 text-emerald-400" />
@@ -1634,11 +1718,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-emerald-300 font-mono">
                 {metrics?.approvedPayments ?? paymentsList.filter((p) => p.status === 'completed').length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Transações concluídas</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Transações concluídas →</div>
+            </button>
 
             {/* 10. Pagamentos pendentes */}
-            <div className="bg-[#0b162b] border border-orange-500/30 shadow-lg shadow-orange-950/20 hover:border-orange-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('payments');
+              }}
+              className="bg-[#0b162b] border border-orange-500/30 shadow-lg shadow-orange-950/20 hover:border-orange-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Conferir pagamentos Pix pendentes"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>PAGAMENTOS PENDENTES</span>
                 <Clock className="w-4 h-4 text-orange-400" />
@@ -1646,11 +1737,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-orange-300 font-mono">
                 {pendingPayments.length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Aguardando conferência Pix</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Aguardando conferência Pix →</div>
+            </button>
 
             {/* 11. Receita */}
-            <div className="bg-[#0b162b] border border-emerald-500/40 shadow-lg shadow-emerald-950/20 hover:border-emerald-300 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('payments');
+              }}
+              className="bg-[#0b162b] border border-emerald-500/40 shadow-lg shadow-emerald-950/20 hover:border-emerald-300 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Ver detalhes de receita e pagamentos"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>RECEITA TOTAL</span>
                 <DollarSign className="w-4 h-4 text-emerald-400" />
@@ -1658,11 +1756,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-emerald-300 font-mono">
                 R$ {metrics?.totalRevenue || '189.90'}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Faturamento acumulado</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Faturamento acumulado →</div>
+            </button>
 
             {/* 12. Total de músicas */}
-            <div className="bg-[#0b162b] border border-amber-500/30 shadow-lg shadow-amber-950/20 hover:border-amber-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('songs');
+              }}
+              className="bg-[#0b162b] border border-amber-500/30 shadow-lg shadow-amber-950/20 hover:border-amber-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Gerenciar catálogo de músicas"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>TOTAL DE MÚSICAS</span>
                 <Music className="w-4 h-4 text-amber-400" />
@@ -1670,11 +1775,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-white font-mono">
                 {metrics?.totalSongs || songsList.length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Cifras e letras cadastradas</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Cifras e letras cadastradas →</div>
+            </button>
 
             {/* 13. Total de repertórios */}
-            <div className="bg-[#0b162b] border border-indigo-500/30 shadow-lg shadow-indigo-950/20 hover:border-indigo-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('playlists');
+              }}
+              className="bg-[#0b162b] border border-indigo-500/30 shadow-lg shadow-indigo-950/20 hover:border-indigo-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Gerenciar setlists"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>TOTAL REPERTÓRIOS</span>
                 <FolderHeart className="w-4 h-4 text-indigo-400" />
@@ -1682,11 +1794,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-white font-mono">
                 {metrics?.totalPlaylists || playlistsList.length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Setlists organizadas</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Setlists organizadas →</div>
+            </button>
 
             {/* 14. Pesquisas realizadas */}
-            <div className="bg-[#0b162b] border border-cyan-500/30 shadow-lg shadow-cyan-950/20 hover:border-cyan-400/60 transition-all rounded-2xl p-4">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('searches');
+              }}
+              className="bg-[#0b162b] border border-cyan-500/30 shadow-lg shadow-cyan-950/20 hover:border-cyan-400 hover:scale-[1.02] active:scale-[0.98] transition-all rounded-2xl p-4 text-left cursor-pointer w-full"
+              title="Ver termos pesquisados"
+            >
               <div className="flex items-center justify-between text-zinc-200 text-xs font-bold mb-1">
                 <span>PESQUISAS REALIZADAS</span>
                 <Search className="w-4 h-4 text-cyan-400" />
@@ -1694,8 +1813,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
               <div className="text-2xl font-black text-cyan-300 font-mono">
                 {metrics?.totalSearches || searchesList.length}
               </div>
-              <div className="text-xs text-zinc-300 mt-1">Buscas de músicas efetuadas</div>
-            </div>
+              <div className="text-xs text-zinc-300 mt-1">Buscas de músicas efetuadas →</div>
+            </button>
           </div>
         </div>
       )}
@@ -2558,9 +2677,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
 
       {/* TAB 5: PESQUISAS REALIZADAS */}
       {activeTab === 'searches' && (
-        <div className="bg-zinc-900/60 border border-zinc-800 rounded-3xl p-6 overflow-hidden">
-          <h3 className="text-base font-bold text-white mb-2">Histórico de Pesquisas dos Usuários</h3>
-          <p className="text-xs text-zinc-400 mb-4">Termos pesquisados na busca musical em tempo real.</p>
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-3xl p-6 overflow-hidden space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-white mb-1">Histórico de Pesquisas dos Usuários</h3>
+              <p className="text-xs text-zinc-400">Termos pesquisados na busca musical em tempo real.</p>
+            </div>
+            {searchesList.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAllSearches}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+                title="Limpar todas as buscas"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>Limpar Histórico ({searchesList.length})</span>
+              </button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-zinc-300">
               <thead className="border-b border-zinc-800 text-[11px] uppercase font-mono text-zinc-500">
@@ -2569,6 +2703,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
                   <th className="py-2.5 px-3">Termo Pesquisado</th>
                   <th className="py-2.5 px-3">Músico</th>
                   <th className="py-2.5 px-3">Resultados</th>
+                  <th className="py-2.5 px-3 text-right">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
@@ -2584,6 +2719,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onLogout, onBackToApp, o
                       <td className="py-2.5 px-3 font-bold text-white">"{search.query}"</td>
                       <td className="py-2.5 px-3 text-zinc-400">{sUser?.nomeArtistico || 'Anônimo'}</td>
                       <td className="py-2.5 px-3 font-mono text-amber-400">{search.resultsCount || 0} encontrados</td>
+                      <td className="py-2.5 px-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSearchDirect(search.id)}
+                          className="p-1.5 bg-zinc-800 hover:bg-rose-500/20 text-zinc-400 hover:text-rose-400 rounded-lg transition-colors cursor-pointer"
+                          title="Excluir este registro de pesquisa"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}

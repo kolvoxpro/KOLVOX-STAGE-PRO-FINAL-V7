@@ -17,11 +17,11 @@ export const KolvoxLogo: React.FC<KolvoxLogoProps> = ({
 
   // Sizing definitions for the logo image (ampliado e com transparência total)
   const sizeMap = {
-    xs: { h: 'h-10 sm:h-12', maxW: 'max-w-[180px]' },
-    sm: { h: 'h-14 sm:h-16', maxW: 'max-w-[240px]' },
-    md: { h: 'h-20 sm:h-24', maxW: 'max-w-[340px]' },
-    lg: { h: 'h-28 sm:h-34', maxW: 'max-w-[460px]' },
-    xl: { h: 'h-36 sm:h-48', maxW: 'max-w-[600px]' },
+    xs: { h: 'h-8 sm:h-10', maxW: 'max-w-[120px] sm:max-w-[150px]' },
+    sm: { h: 'h-10 sm:h-14', maxW: 'max-w-[160px] sm:max-w-[220px]' },
+    md: { h: 'h-14 sm:h-20', maxW: 'max-w-[220px] sm:max-w-[320px]' },
+    lg: { h: 'h-24 sm:h-30', maxW: 'max-w-[340px] sm:max-w-[440px]' },
+    xl: { h: 'h-32 sm:h-44', maxW: 'max-w-[460px] sm:max-w-[580px]' },
   };
 
   const currentSize = sizeMap[size] || sizeMap.md;

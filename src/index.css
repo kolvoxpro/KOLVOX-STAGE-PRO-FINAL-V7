@@ -336,15 +336,17 @@
 .btn-icon {
   background: var(--ink-faint);
   color: var(--ink);
-  width: 36px;
-  height: 36px;
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
   border: 1px solid var(--ink-faint);
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  flex-shrink: 0;
 }
 
 .btn-icon:hover {
@@ -1103,8 +1105,9 @@ button {
   position: relative;
   z-index: 10;
   width: 100%;
-  max-width: 100%;
+  max-width: 100vw;
   box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .sidebar {
@@ -1310,7 +1313,7 @@ button {
 
 .top-actions {
   display: flex;
-  gap: 12px;
+  gap: 6px;
   align-items: center;
 }
 
@@ -1706,8 +1709,10 @@ button {
 
 .library-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width, 240px), 1fr));
+  gap: var(--grid-gap, 15px);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .library-card {
@@ -1750,7 +1755,7 @@ button {
   text-overflow: ellipsis;
 }
 
-.library-card button {
+.library-card button.btn-card-legacy {
   width: 100%;
   padding: 9px;
   color: var(--blue-light);
@@ -1762,7 +1767,7 @@ button {
   margin-top: auto;
 }
 
-.library-card button:hover {
+.library-card button.btn-card-legacy:hover {
   background: rgba(0,160,255,.1);
 }
 
@@ -2598,26 +2603,31 @@ button {
   }
   .main-content {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 100vw !important;
     margin-left: 0 !important;
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
     min-width: 0 !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
   }
   .topbar {
     height: auto !important;
-    min-height: 56px !important;
-    padding: 0.5rem 0.85rem !important;
+    min-height: 52px !important;
+    padding: 0.4rem 0.75rem !important;
     gap: 0.5rem !important;
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
   }
   .mobile-brand {
     display: block !important;
   }
   .page {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 100vw !important;
     margin-left: auto !important;
     margin-right: auto !important;
-    padding: 1rem 0.85rem calc(4.75rem + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 0.85rem 0.75rem calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
     box-sizing: border-box !important;
     overflow-x: hidden !important;
   }
@@ -2873,6 +2883,20 @@ button {
     font-size: 1.75rem !important;
     text-align: center !important;
   }
+  .library-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .library-card {
+    padding: 16px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    align-items: stretch !important;
+  }
 }
 
 /* Small Portrait Phones <= 550px */
@@ -2947,23 +2971,27 @@ button {
     line-height: 1.8;
   }
   .library-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
-    gap: 8px !important;
-    justify-content: center !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
   .library-card {
-    padding: 12px !important;
-    text-align: center !important;
+    padding: 14px 16px !important;
+    text-align: left !important;
     display: flex !important;
     flex-direction: column !important;
-    align-items: center !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
   .library-card h3 {
-    text-align: center !important;
+    text-align: left !important;
     width: 100% !important;
   }
   .library-card p {
-    text-align: center !important;
+    text-align: left !important;
     width: 100% !important;
   }
   .library-card .delete-front-btn {

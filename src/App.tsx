@@ -15,7 +15,7 @@ import { SelectSetlistForSongModal } from './components/SelectSetlistForSongModa
 import { MediaRecordingStudio } from './components/MediaRecordingStudio';
 import { VideoPlaybackModal } from './components/VideoPlaybackModal';
 import { SubscriptionView } from './components/SubscriptionView';
-import { ListMusic, Video, Mic, Film, Plus, Check, Search, Music, Sparkles, Loader2 } from 'lucide-react';
+import { ListMusic, Video, Mic, Film, Plus, Check, Search, Music, Sparkles, Loader2, Trash2, Sliders, Play, Star } from 'lucide-react';
 import { musicSearchProvider } from './services/MusicSearchProvider';
 import { findVerifiedFullLyrics } from './data/fullLyricsCatalog';
 import confetti from 'canvas-confetti';
@@ -93,6 +93,42 @@ export default function App() {
   const [activeVideoModal, setActiveVideoModal] = useState<Recording | null>(null);
   const [addToSetlistTab, setAddToSetlistTab] = useState<'global' | 'library' | 'new'>('global');
   const [filterLibrarySearch, setFilterLibrarySearch] = useState('');
+
+  // Manual button and card resizing states (persisted in localStorage)
+  const [cardBtnScale, setCardBtnScale] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('kolvox_lib_btn_scale');
+      return saved ? Number(saved) : 100;
+    } catch {
+      return 100;
+    }
+  });
+
+  const [cardBtnLayout, setCardBtnLayout] = useState<'stacked' | 'row'>(() => {
+    try {
+      const saved = localStorage.getItem('kolvox_lib_btn_layout');
+      return saved === 'row' ? 'row' : 'stacked';
+    } catch {
+      return 'stacked';
+    }
+  });
+
+  const [cardMinWidth, setCardMinWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('kolvox_lib_card_width');
+      return saved ? Number(saved) : 280;
+    } catch {
+      return 280;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('kolvox_lib_btn_scale', String(cardBtnScale));
+      localStorage.setItem('kolvox_lib_btn_layout', cardBtnLayout);
+      localStorage.setItem('kolvox_lib_card_width', String(cardMinWidth));
+    } catch {}
+  }, [cardBtnScale, cardBtnLayout, cardMinWidth]);
 
   // Auth modal overlay state (e.g. from final links, header button, or subscription view)
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
@@ -351,6 +387,22 @@ export default function App() {
         console.warn('Silent delete from db:', err);
       }
     }
+  };
+
+  const handleBatchDeleteAllLibrarySongs = async () => {
+    if (allLibrarySongs.length === 0) return;
+    if (!confirm(`Tem certeza que deseja excluir todas as ${allLibrarySongs.length} músicas da Minha Biblioteca?`)) return;
+    if (user) {
+      const next = Array.from(new Set([...deletedSongIds, ...allLibrarySongs.map((s) => s.id)]));
+      setDeletedSongIds(next);
+      try {
+        localStorage.setItem(`kolvox_deleted_songs_${user.uid}`, JSON.stringify(next));
+      } catch {}
+      await Promise.allSettled(allLibrarySongs.map((s) => deleteSongFromLibrary(user.uid, s.id)));
+    }
+    setUserSongs([]);
+    setFavorites([]);
+    showToast('Todas as músicas foram removidas da Minha Biblioteca.');
   };
 
   const handleDeleteRecording = async (recId: string) => {
@@ -1214,68 +1266,39 @@ export default function App() {
         {/* MAIN CONTENT */}
         <main className="main-content">
           {/* TOPBAR */}
-          <header className="topbar">
+          <header className="topbar flex items-center justify-between gap-2 px-3 sm:px-6 w-full max-w-full overflow-hidden box-border">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              {/* LOGO GRANDE (CONFORME SOLICITADO: "SO DEIXA O LOGO GRANDE") */}
               <div
-                className="mobile-brand cursor-pointer flex items-center shrink-0"
+                className="mobile-brand cursor-pointer flex items-center shrink-0 py-0.5"
                 onClick={() => setCurrentPage('home')}
               >
                 <KolvoxLogo size="md" />
               </div>
-
-              {/* Status do Plano & Tempo para Expirar */}
-              {isAdmin ? (
-                <div className="admin-badge text-[10px] sm:text-xs px-2 py-0.5 whitespace-nowrap">
-                  <span className="hidden sm:inline">Conta </span>Admin
-                </div>
-              ) : isPremiumActive ? (
-                <div
-                  className="admin-badge text-[10px] sm:text-xs px-2 py-0.5 whitespace-nowrap"
-                  style={{ color: 'rgb(52, 211, 153)', background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.25)' }}
-                >
-                  👑 <span className="hidden sm:inline">Plano </span>PRO
-                </div>
-              ) : (
-                <div
-                  className="admin-badge text-[10px] sm:text-xs px-2 py-0.5 whitespace-nowrap"
-                  style={{ color: 'rgb(251, 191, 36)', background: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.25)' }}
-                >
-                  ⏱ <span className="hidden sm:inline">Teste: </span>{trialDaysLeft}d {trialHoursLeft}h
-                </div>
-              )}
             </div>
 
-            {/* AÇÕES DESKTOP */}
-            <div className="top-actions hidden md:flex items-center gap-2">
-              {isAdmin && (
-                <button
-                  id="topbar-admin-btn"
-                  className="btn-primary"
-                  style={{ background: 'transparent', color: 'var(--ink)', border: '1px solid var(--ink-faint)', fontSize: '0.75rem', padding: '0.45rem 0.9rem' }}
-                  onClick={() => setCurrentPage('admin')}
-                >
-                  🛡️ Admin
-                </button>
-              )}
-
+            {/* ÍCONES DO CABEÇALHO DIMINUÍDOS (CONFORME SOLICITADO: "ESSES ICONES ESTA MUITO GRANDE DIMINUA") */}
+            <div className="top-actions flex items-center gap-1.5 sm:gap-2 shrink-0">
               <button
                 id="topbar-plans-btn"
-                className="btn-primary flex items-center gap-1.5"
+                className="btn-primary flex items-center gap-1 shrink-0"
                 style={{
                   background: isPremiumActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 229, 255, 0.15)',
                   color: isPremiumActive ? '#10b981' : '#00e5ff',
                   border: `1px solid ${isPremiumActive ? 'rgba(16, 185, 129, 0.4)' : 'rgba(0, 229, 255, 0.4)'}`,
-                  fontSize: '0.75rem',
-                  padding: '0.45rem 0.9rem',
+                  fontSize: '0.62rem',
+                  padding: '0.2rem 0.45rem',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  borderRadius: '4px',
+                  borderRadius: '5px',
                 }}
                 onClick={() => setCurrentPage('plans')}
                 title="Planos Pagos & Pix"
               >
-                <span>💎</span>
-                <span>{isPremiumActive ? '👑 Plano PRO' : 'Planos & Pix'}</span>
+                <span className="text-[10px]">💎</span>
+                <span className="text-[10px] font-bold tracking-wider uppercase">
+                  {isPremiumActive ? '👑 PRO' : 'Planos'}
+                </span>
               </button>
 
               <button
@@ -1302,32 +1325,12 @@ export default function App() {
               >
                 🎤
               </button>
-            </div>
 
-            {/* AÇÕES MOBILE COMPACTAS (SEM ESTOURAR A TELA) */}
-            <div className="flex md:hidden items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                className="w-8 h-8 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 flex items-center justify-center text-sm font-bold active:scale-95 cursor-pointer"
-                title="Adicionar Música"
-                onClick={() => setShowAddSongModal(true)}
-              >
-                +
-              </button>
-
-              <button
-                type="button"
-                className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 flex items-center justify-center text-sm active:scale-95 shadow-sm cursor-pointer"
-                title="Modo Show"
-                onClick={handleOpenShowModeNavigation}
-              >
-                🎤
-              </button>
-
+              {/* PERFIL / MENU EM TELAS PEQUENAS (COMPACTO) */}
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(true)}
-                className="w-8 h-8 rounded-lg bg-cyan-500 text-zinc-950 font-black text-xs flex items-center justify-center cursor-pointer shadow-sm active:scale-95"
+                className="md:hidden w-[26px] h-[26px] rounded-[5px] bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-black text-[9px] flex items-center justify-center cursor-pointer shadow-xs active:scale-95 shrink-0"
                 title="Abrir Menu e Perfil"
               >
                 {userInitials}
@@ -1564,15 +1567,28 @@ export default function App() {
                   <span className="small-label">REPERTÓRIO PESSOAL</span>
                   <h1>Minha Biblioteca</h1>
                 </div>
-                <button
-                  className="primary-button"
-                  onClick={() => {
-                    setAddSongModalTab('manual');
-                    setShowAddSongModal(true);
-                  }}
-                >
-                  + Adicionar música
-                </button>
+                <div className="flex items-center gap-2">
+                  {allLibrarySongs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleBatchDeleteAllLibrarySongs}
+                      className="px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Excluir todas as músicas da biblioteca"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Excluir Todas ({allLibrarySongs.length})</span>
+                    </button>
+                  )}
+                  <button
+                    className="primary-button"
+                    onClick={() => {
+                      setAddSongModalTab('manual');
+                      setShowAddSongModal(true);
+                    }}
+                  >
+                    + Adicionar música
+                  </button>
+                </div>
               </div>
 
               {/* BARRA DE SETLIST ALVO / ORGANIZAÇÃO */}
@@ -1629,7 +1645,128 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="library-grid">
+              {/* BARRA DE REDIMENSIONAMENTO MANUAL DOS BOTÕES E CARDS */}
+              <div className="bg-[#050f1d]/90 border border-blue-900/40 rounded-2xl p-3 px-4 mb-5 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 shadow-lg">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-xs">
+                    <Sliders className="w-4 h-4" />
+                    <span className="uppercase tracking-wider">Redimensionar Botões:</span>
+                  </div>
+
+                  {/* Stepper buttons - / + */}
+                  <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setCardBtnScale((prev) => Math.max(70, prev - 10))}
+                      className="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-sm font-bold flex items-center justify-center transition-colors cursor-pointer"
+                      title="Diminuir tamanho dos botões (-10%)"
+                    >
+                      −
+                    </button>
+                    <span className="text-xs font-mono font-bold text-cyan-300 px-2 min-w-[50px] text-center">
+                      {cardBtnScale}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCardBtnScale((prev) => Math.min(160, prev + 10))}
+                      className="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-sm font-bold flex items-center justify-center transition-colors cursor-pointer"
+                      title="Aumentar tamanho dos botões (+10%)"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Presets P, M, G, GG */}
+                  <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1">
+                    {[
+                      { label: 'P', scale: 80, title: 'Pequeno (80%)' },
+                      { label: 'M', scale: 100, title: 'Médio / Padrão (100%)' },
+                      { label: 'G', scale: 120, title: 'Grande (120%)' },
+                      { label: 'GG', scale: 140, title: 'Extra Grande (140%)' },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => setCardBtnScale(preset.scale)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          cardBtnScale === preset.scale
+                            ? 'bg-cyan-500 text-zinc-950 font-black shadow-xs'
+                            : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                        }`}
+                        title={preset.title}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Disposição: Empilhado ou Lado a Lado */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-zinc-400 font-semibold">Disposição:</span>
+                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setCardBtnLayout('stacked')}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          cardBtnLayout === 'stacked'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                        }`}
+                        title="Botões empilhados (largura total, ideal para não espremer texto)"
+                      >
+                        Empilhado
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCardBtnLayout('row')}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          cardBtnLayout === 'row'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                        }`}
+                        title="Botões lado a lado"
+                      >
+                        Lado a Lado
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tamanho dos cards (exibido em telas a partir de tablet/landscape, pois no celular em pé usa 1 coluna adaptável) */}
+                  <div className="hidden sm:flex items-center gap-1.5">
+                    <span className="text-[11px] text-zinc-400 font-semibold">Cards:</span>
+                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1">
+                      {[
+                        { id: 'compact', label: 'Mais Cards', width: 220 },
+                        { id: 'normal', label: 'Equilibrado', width: 280 },
+                        { id: 'wide', label: 'Espaçoso', width: 350 },
+                      ].map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setCardMinWidth(c.width)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            cardMinWidth === c.width
+                              ? 'bg-amber-500 text-zinc-950 font-black shadow-xs'
+                              : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
+                          }`}
+                        >
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="library-grid w-full"
+                style={{
+                  '--card-min-width': `${cardMinWidth}px`,
+                  '--grid-gap': `${Math.round(14 * (cardBtnScale / 100))}px`,
+                } as React.CSSProperties}
+              >
                 {allLibrarySongs.length === 0 ? (
                   <div className="col-span-full py-16 text-center bg-[#050f1d]/70 border border-[#0d4d82]/40 rounded-3xl p-8 flex flex-col items-center">
                     <div className="text-4xl mb-3">🎵</div>
@@ -1653,81 +1790,211 @@ export default function App() {
                   const isAlreadyInActiveSetlist = Boolean(
                     activeSetlist?.songs?.some((track) => track.id === s.id)
                   );
+                  const scale = cardBtnScale / 100;
                   return (
-                    <div key={s.id} className="library-card">
+                    <div
+                      key={s.id}
+                      className="library-card"
+                      style={{
+                        padding: `${Math.round(18 * scale)}px`,
+                        borderRadius: `${Math.round(14 * scale)}px`,
+                      }}
+                    >
+                      {/* TOPO DO CARD: BOTÃO EXCLUIR E FAVORITO */}
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <button
                           type="button"
                           onClick={() => handleDeleteSong(s.id)}
-                          title="Excluir música"
-                          className="delete-front-btn"
+                          title="Excluir música do acervo"
+                          style={{
+                            padding: `${Math.round(5 * scale)}px ${Math.round(10 * scale)}px`,
+                            fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                            gap: `${Math.round(4 * scale)}px`,
+                          }}
+                          className="delete-front-btn cursor-pointer inline-flex items-center"
                         >
-                          <span>🗑</span>
+                          <Trash2 style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} />
                           <span>Excluir</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => toggleFavorite(s.id)}
-                          className="text-lg text-amber-400 bg-transparent p-1"
-                          title="Favoritar"
+                          style={{
+                            fontSize: `${Math.round(18 * scale)}px`,
+                          }}
+                          className="text-amber-400 hover:text-amber-300 bg-transparent p-1 transition-transform hover:scale-110 cursor-pointer"
+                          title={isFav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
                         >
                           {isFav ? '★' : '☆'}
                         </button>
                       </div>
-                      <h3>{s.title}</h3>
-                      <p>{s.artist}</p>
-                      <div className="flex gap-2 mt-auto">
-                        <button
-                          onClick={() => handleOpenSongInShowMode(s)}
-                          className="hover:border-blue-400 flex-1"
-                        >
-                          Abrir no Modo Show
-                        </button>
 
-                        {/* BOTÃO ADICIONAR SEPARADAMENTE À SETLIST */}
-                        {isAlreadyInActiveSetlist ? (
+                      {/* TÍTULO E ARTISTA */}
+                      <h3
+                        className="font-bold text-white truncate"
+                        style={{ fontSize: `${Math.max(12, Math.round(14 * scale))}px` }}
+                        title={s.title}
+                      >
+                        {s.title}
+                      </h3>
+                      <p
+                        className="text-zinc-400 truncate mt-0.5 mb-3"
+                        style={{ fontSize: `${Math.max(10, Math.round(11 * scale))}px` }}
+                        title={s.artist}
+                      >
+                        {s.artist}
+                      </p>
+
+                      {/* BOTÕES DE AÇÃO: DISPOSIÇÃO EMPILHADA OU LADO A LADO */}
+                      {cardBtnLayout === 'stacked' ? (
+                        <div className="flex flex-col gap-2 mt-auto pt-2.5 border-t border-zinc-800/80">
                           <button
                             type="button"
-                            onClick={() => {
-                              if (activeSetlist) {
-                                handleRemoveSongFromSetlist(activeSetlist.id, s.id);
-                                showToast(`"${s.title}" removida do setlist "${activeSetlist.name}".`);
-                              }
+                            onClick={() => handleOpenSongInShowMode(s)}
+                            style={{
+                              padding: `${Math.round(7 * scale)}px ${Math.round(14 * scale)}px`,
+                              fontSize: `${Math.max(10, Math.round(12 * scale))}px`,
+                              minHeight: `${Math.round(34 * scale)}px`,
                             }}
-                            className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                            title={`Música incluída no setlist "${activeSetlist?.name}". Clique para remover se desejar.`}
+                            className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 transition-all cursor-pointer whitespace-nowrap"
+                            title="Tocar cifra e letra no Modo Show"
                           >
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                            <span>✓ No Setlist</span>
+                            <Play style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} className="fill-current" />
+                            <span>Abrir no Modo Show</span>
                           </button>
-                        ) : (
+
+                          <div className="flex items-center gap-1.5">
+                            {isAlreadyInActiveSetlist ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (activeSetlist) {
+                                    handleRemoveSongFromSetlist(activeSetlist.id, s.id);
+                                    showToast(`"${s.title}" removida do setlist "${activeSetlist.name}".`);
+                                  }
+                                }}
+                                style={{
+                                  padding: `${Math.round(6 * scale)}px ${Math.round(10 * scale)}px`,
+                                  fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                  minHeight: `${Math.round(30 * scale)}px`,
+                                }}
+                                className="flex-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+                                title={`Música incluída no setlist "${activeSetlist?.name}". Clique para remover.`}
+                              >
+                                <Check style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} className="stroke-[3]" />
+                                <span>✓ No Setlist</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!activeSetlist) {
+                                    setSongToAddToSetlist(s);
+                                    return;
+                                  }
+                                  await handleAddSongToSetlist(activeSetlist.id, s);
+                                }}
+                                style={{
+                                  padding: `${Math.round(6 * scale)}px ${Math.round(10 * scale)}px`,
+                                  fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                  minHeight: `${Math.round(30 * scale)}px`,
+                                }}
+                                className="flex-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-amber-200 font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+                                title={activeSetlist ? `Adicionar individualmente ao setlist "${activeSetlist.name}"` : 'Adicionar à Minha Setlist'}
+                              >
+                                <Plus style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} />
+                                <span>+ Setlist</span>
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setSongToAddToSetlist(s)}
+                              style={{
+                                width: `${Math.round(32 * scale)}px`,
+                                height: `${Math.round(30 * scale)}px`,
+                              }}
+                              className="rounded-xl bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                              title="Escolher outro setlist para esta música..."
+                            >
+                              <ListMusic style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 mt-auto pt-2.5 border-t border-zinc-800/80 flex-wrap">
                           <button
                             type="button"
-                            onClick={async () => {
-                              if (!activeSetlist) {
-                                setSongToAddToSetlist(s);
-                                return;
-                              }
-                              await handleAddSongToSetlist(activeSetlist.id, s);
+                            onClick={() => handleOpenSongInShowMode(s)}
+                            style={{
+                              padding: `${Math.round(6 * scale)}px ${Math.round(10 * scale)}px`,
+                              fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                              minHeight: `${Math.round(32 * scale)}px`,
                             }}
-                            className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-amber-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                            title={activeSetlist ? `Adicionar individualmente ao setlist "${activeSetlist.name}"` : 'Adicionar à Minha Setlist'}
+                            className="flex-1 min-w-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 transition-all cursor-pointer whitespace-nowrap"
+                            title="Tocar cifra e letra no Modo Show"
                           >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>+ Setlist</span>
+                            <Play style={{ width: `${Math.round(12 * scale)}px`, height: `${Math.round(12 * scale)}px` }} className="fill-current" />
+                            <span className="truncate">Modo Show</span>
                           </button>
-                        )}
 
-                        {/* ESCOLHER OUTRO SETLIST */}
-                        <button
-                          type="button"
-                          onClick={() => setSongToAddToSetlist(s)}
-                          className="p-2 rounded-xl bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-white text-xs flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                          title="Escolher outro setlist para esta música..."
-                        >
-                          <ListMusic className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                          {isAlreadyInActiveSetlist ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (activeSetlist) {
+                                  handleRemoveSongFromSetlist(activeSetlist.id, s.id);
+                                  showToast(`"${s.title}" removida do setlist "${activeSetlist.name}".`);
+                                }
+                              }}
+                              style={{
+                                padding: `${Math.round(6 * scale)}px ${Math.round(8 * scale)}px`,
+                                fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                minHeight: `${Math.round(32 * scale)}px`,
+                              }}
+                              className="rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                              title={`Música incluída no setlist "${activeSetlist?.name}". Clique para remover.`}
+                            >
+                              <Check style={{ width: `${Math.round(12 * scale)}px`, height: `${Math.round(12 * scale)}px` }} className="stroke-[3]" />
+                              <span>✓ Setlist</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!activeSetlist) {
+                                  setSongToAddToSetlist(s);
+                                  return;
+                                }
+                                await handleAddSongToSetlist(activeSetlist.id, s);
+                              }}
+                              style={{
+                                padding: `${Math.round(6 * scale)}px ${Math.round(8 * scale)}px`,
+                                fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                minHeight: `${Math.round(32 * scale)}px`,
+                              }}
+                              className="rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-amber-200 font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                              title={activeSetlist ? `Adicionar individualmente ao setlist "${activeSetlist.name}"` : 'Adicionar à Minha Setlist'}
+                            >
+                              <Plus style={{ width: `${Math.round(12 * scale)}px`, height: `${Math.round(12 * scale)}px` }} />
+                              <span>+ Setlist</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setSongToAddToSetlist(s)}
+                            style={{
+                              width: `${Math.round(32 * scale)}px`,
+                              height: `${Math.round(32 * scale)}px`,
+                            }}
+                            className="p-1.5 rounded-xl bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                            title="Escolher outro setlist para esta música..."
+                          >
+                            <ListMusic style={{ width: `${Math.round(12 * scale)}px`, height: `${Math.round(12 * scale)}px` }} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -2188,88 +2455,220 @@ export default function App() {
               </div>
 
               {favorites.length > 0 ? (
-                <div className="library-grid">
+                <div
+                  className="library-grid"
+                  style={{
+                    gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinWidth}px, 1fr))`,
+                    gap: `${Math.round(14 * (cardBtnScale / 100))}px`,
+                  }}
+                >
                   {allLibrarySongs
                     .filter((s) => favorites.includes(s.id))
                     .map((s) => {
                       const isAlreadyInActiveSetlist = Boolean(
                         activeSetlist?.songs?.some((track) => track.id === s.id)
                       );
+                      const scale = cardBtnScale / 100;
                       return (
-                        <div key={s.id} className="library-card">
+                        <div
+                          key={s.id}
+                          className="library-card"
+                          style={{
+                            padding: `${Math.round(18 * scale)}px`,
+                            borderRadius: `${Math.round(14 * scale)}px`,
+                          }}
+                        >
                           <div className="flex items-center justify-between gap-2 mb-3">
                             <button
                               type="button"
                               onClick={() => handleDeleteSong(s.id)}
                               title="Excluir música"
-                              className="delete-front-btn"
+                              style={{
+                                padding: `${Math.round(5 * scale)}px ${Math.round(10 * scale)}px`,
+                                fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                gap: `${Math.round(4 * scale)}px`,
+                              }}
+                              className="delete-front-btn cursor-pointer inline-flex items-center"
                             >
-                              <span>🗑</span>
+                              <Trash2 style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} />
                               <span>Excluir</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => toggleFavorite(s.id)}
-                              className="text-lg text-amber-400 bg-transparent p-1"
+                              style={{
+                                fontSize: `${Math.round(18 * scale)}px`,
+                              }}
+                              className="text-amber-400 hover:text-amber-300 bg-transparent p-1 transition-transform hover:scale-110 cursor-pointer"
                               title="Remover dos favoritos"
                             >
                               ★
                             </button>
                           </div>
-                          <h3>{s.title}</h3>
-                          <p>{s.artist}</p>
-                          <div className="flex gap-2 mt-auto">
-                            <button
-                              onClick={() => handleOpenSongInShowMode(s)}
-                              className="hover:border-blue-400 flex-1"
-                            >
-                              Abrir no Modo Show
-                            </button>
+                          <h3
+                            className="font-bold text-white truncate"
+                            style={{ fontSize: `${Math.max(12, Math.round(14 * scale))}px` }}
+                            title={s.title}
+                          >
+                            {s.title}
+                          </h3>
+                          <p
+                            className="text-zinc-400 truncate mt-0.5 mb-3"
+                            style={{ fontSize: `${Math.max(10, Math.round(11 * scale))}px` }}
+                            title={s.artist}
+                          >
+                            {s.artist}
+                          </p>
 
-                            {/* BOTÃO ADICIONAR SEPARADAMENTE À SETLIST */}
-                            {isAlreadyInActiveSetlist ? (
+                          {cardBtnLayout === 'stacked' ? (
+                            <div className="flex flex-col gap-2 mt-auto pt-2.5 border-t border-zinc-800/80">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  if (activeSetlist) {
-                                    handleRemoveSongFromSetlist(activeSetlist.id, s.id);
-                                    showToast(`"${s.title}" removida do setlist "${activeSetlist.name}".`);
-                                  }
+                                onClick={() => handleOpenSongInShowMode(s)}
+                                style={{
+                                  padding: `${Math.round(7 * scale)}px ${Math.round(14 * scale)}px`,
+                                  fontSize: `${Math.max(10, Math.round(12 * scale))}px`,
+                                  minHeight: `${Math.round(34 * scale)}px`,
                                 }}
-                                className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                                title={`Música incluída no setlist "${activeSetlist?.name}". Clique para remover se desejar.`}
+                                className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 transition-all cursor-pointer whitespace-nowrap"
+                                title="Tocar cifra e letra no Modo Show"
                               >
-                                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                <span>✓ No Setlist</span>
+                                <Play style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} className="fill-current" />
+                                <span>Abrir no Modo Show</span>
                               </button>
-                            ) : (
+
+                              <div className="flex items-center gap-1.5">
+                                {isAlreadyInActiveSetlist ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (activeSetlist) {
+                                        handleRemoveSongFromSetlist(activeSetlist.id, s.id);
+                                        showToast(`"${s.title}" removida do setlist "${activeSetlist.name}".`);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: `${Math.round(6 * scale)}px ${Math.round(10 * scale)}px`,
+                                      fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                      minHeight: `${Math.round(30 * scale)}px`,
+                                    }}
+                                    className="flex-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+                                    title={`Música incluída no setlist "${activeSetlist?.name}". Clique para remover.`}
+                                  >
+                                    <Check style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} className="stroke-[3]" />
+                                    <span>✓ No Setlist</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!activeSetlist) {
+                                        setSongToAddToSetlist(s);
+                                        return;
+                                      }
+                                      await handleAddSongToSetlist(activeSetlist.id, s);
+                                    }}
+                                    style={{
+                                      padding: `${Math.round(6 * scale)}px ${Math.round(10 * scale)}px`,
+                                      fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                      minHeight: `${Math.round(30 * scale)}px`,
+                                    }}
+                                    className="flex-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-amber-200 font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+                                    title={activeSetlist ? `Adicionar individualmente ao setlist "${activeSetlist.name}"` : 'Adicionar à Minha Setlist'}
+                                  >
+                                    <Plus style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} />
+                                    <span>+ Setlist</span>
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => setSongToAddToSetlist(s)}
+                                  style={{
+                                    width: `${Math.round(32 * scale)}px`,
+                                    height: `${Math.round(30 * scale)}px`,
+                                  }}
+                                  className="rounded-xl bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                                  title="Escolher outro setlist para esta música..."
+                                >
+                                  <ListMusic style={{ width: `${Math.round(13 * scale)}px`, height: `${Math.round(13 * scale)}px` }} />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 mt-auto pt-2.5 border-t border-zinc-800/80 flex-wrap">
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  if (!activeSetlist) {
-                                    setSongToAddToSetlist(s);
-                                    return;
-                                  }
-                                  await handleAddSongToSetlist(activeSetlist.id, s);
+                                onClick={() => handleOpenSongInShowMode(s)}
+                                style={{
+                                  padding: `${Math.round(6 * scale)}px ${Math.round(10 * scale)}px`,
+                                  fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                  minHeight: `${Math.round(32 * scale)}px`,
                                 }}
-                                className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-amber-200 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                                title={activeSetlist ? `Adicionar individualmente ao setlist "${activeSetlist.name}"` : 'Adicionar à Minha Setlist'}
+                                className="flex-1 min-w-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 transition-all cursor-pointer whitespace-nowrap"
+                                title="Tocar cifra e letra no Modo Show"
                               >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>+ Setlist</span>
+                                <Play style={{ width: `${Math.round(12 * scale)}px`, height: `${Math.round(12 * scale)}px` }} className="fill-current" />
+                                <span className="truncate">Modo Show</span>
                               </button>
-                            )}
 
-                            {/* ESCOLHER OUTRO SETLIST */}
-                            <button
-                              type="button"
-                              onClick={() => setSongToAddToSetlist(s)}
-                              className="p-2 rounded-xl bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-white text-xs flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                              title="Escolher outro setlist para esta música..."
-                            >
-                              <ListMusic className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
+                              {isAlreadyInActiveSetlist ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (activeSetlist) {
+                                      handleRemoveSongFromSetlist(activeSetlist.id, s.id);
+                                      showToast(`"${s.title}" removida do setlist "${activeSetlist.name}".`);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: `${Math.round(6 * scale)}px ${Math.round(8 * scale)}px`,
+                                    fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                    minHeight: `${Math.round(32 * scale)}px`,
+                                  }}
+                                  className="rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                                  title={`Música incluída no setlist "${activeSetlist?.name}". Clique para remover.`}
+                                >
+                                  <Check style={{ width: `${Math.round(12 * scale)}px`, height: `${Math.round(12 * scale)}px` }} className="stroke-[3]" />
+                                  <span>✓ Setlist</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!activeSetlist) {
+                                      setSongToAddToSetlist(s);
+                                      return;
+                                    }
+                                    await handleAddSongToSetlist(activeSetlist.id, s);
+                                  }}
+                                  style={{
+                                    padding: `${Math.round(6 * scale)}px ${Math.round(8 * scale)}px`,
+                                    fontSize: `${Math.max(9, Math.round(11 * scale))}px`,
+                                    minHeight: `${Math.round(32 * scale)}px`,
+                                  }}
+                                  className="rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:text-amber-200 font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                                  title={activeSetlist ? `Adicionar individualmente ao setlist "${activeSetlist.name}"` : 'Adicionar à Minha Setlist'}
+                                >
+                                  <Plus style={{ width: `${Math.round(12 * scale)}px`, height: `${Math.round(12 * scale)}px` }} />
+                                  <span>+ Setlist</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => setSongToAddToSetlist(s)}
+                                style={{
+                                  width: `${Math.round(32 * scale)}px`,
+                                  height: `${Math.round(32 * scale)}px`,
+                                }}
+                                className="p-1.5 rounded-xl bg-zinc-850 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                                title="Escolher outro setlist para esta música..."
+                              >
+                                <ListMusic style={{ width: `${Math.round(12 * scale)}px`, height: `${Math.round(12 * scale)}px` }} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -2760,6 +3159,7 @@ export default function App() {
         onClose={() => setShowAddToSetlistModal(false)}
         onAddSongToSetlist={handleAddSongToSetlist}
         onRemoveSongFromSetlist={handleRemoveSongFromSetlist}
+        onDeleteSongFromLibrary={handleDeleteSong}
         onSongSavedToLibrary={(song) => {
           setUserSongs((prev) => [song, ...prev.filter((s) => s.id !== song.id)]);
         }}

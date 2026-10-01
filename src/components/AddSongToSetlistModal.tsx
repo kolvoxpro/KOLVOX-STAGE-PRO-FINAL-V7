@@ -20,6 +20,7 @@ import {
   Mic2,
   Disc3,
   Flame,
+  Trash2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -33,6 +34,7 @@ interface AddSongToSetlistModalProps {
   onAddSongToSetlist: (playlistId: string, song: Song) => Promise<void>;
   onRemoveSongFromSetlist?: (playlistId: string, songId: string) => Promise<void> | void;
   onSongSavedToLibrary: (song: Song) => void;
+  onDeleteSongFromLibrary?: (songId: string) => void;
   onShowToast: (msg: string) => void;
 }
 
@@ -46,6 +48,7 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
   onAddSongToSetlist,
   onRemoveSongFromSetlist,
   onSongSavedToLibrary,
+  onDeleteSongFromLibrary,
   onShowToast,
 }) => {
   const [activeTab, setActiveTab] = useState<'global' | 'library' | 'new'>('global');
@@ -650,15 +653,33 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
               {allLibrarySongs.length > 0 ? (
                 <>
-                  <div className="relative">
-                    <Search size={18} className="absolute left-4 top-3.5 text-zinc-500 pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Filtrar músicas da sua biblioteca pessoal..."
-                      value={libraryFilter}
-                      onChange={(e) => setLibraryFilter(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs sm:text-sm text-white focus:border-blue-500 outline-none"
-                    />
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div className="relative flex-1">
+                      <Search size={18} className="absolute left-4 top-3.5 text-zinc-500 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Filtrar músicas da sua biblioteca pessoal..."
+                        value={libraryFilter}
+                        onChange={(e) => setLibraryFilter(e.target.value)}
+                        className="w-full pl-11 pr-4 py-3 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs sm:text-sm text-white focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    {onDeleteSongFromLibrary && allLibrarySongs.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Tem certeza que deseja excluir todas as ${allLibrarySongs.length} músicas da sua biblioteca pessoal?`)) {
+                            allLibrarySongs.forEach((s) => onDeleteSongFromLibrary(s.id));
+                            onShowToast('Todas as músicas foram removidas da biblioteca.');
+                          }
+                        }}
+                        className="px-3.5 py-3 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                        title="Excluir todas as músicas da sua biblioteca"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Excluir Todas ({allLibrarySongs.length})</span>
+                      </button>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
@@ -685,33 +706,50 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                               )}
                             </div>
 
-                            {isAlreadyIn ? (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (onRemoveSongFromSetlist) {
-                                    await onRemoveSongFromSetlist(activeSetlist.id, song.id);
-                                    onShowToast(`"${song.title}" removida do setlist.`);
-                                  }
-                                }}
-                                className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-all cursor-pointer"
-                                title="Música adicionada. Clique para remover do setlist se desejar."
-                              >
-                                ✓ No Setlist
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  await onAddSongToSetlist(activeSetlist.id, song);
-                                  onShowToast(`"${song.title}" adicionada separadamente ao setlist!`);
-                                }}
-                                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20"
-                              >
-                                <Plus size={14} />
-                                <span>Adicionar</span>
-                              </button>
-                            )}
+                            <div className="flex items-center gap-2 shrink-0">
+                              {isAlreadyIn ? (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (onRemoveSongFromSetlist) {
+                                      await onRemoveSongFromSetlist(activeSetlist.id, song.id);
+                                      onShowToast(`"${song.title}" removida do setlist.`);
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-all cursor-pointer"
+                                  title="Música adicionada. Clique para remover do setlist se desejar."
+                                >
+                                  ✓ No Setlist
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await onAddSongToSetlist(activeSetlist.id, song);
+                                    onShowToast(`"${song.title}" adicionada separadamente ao setlist!`);
+                                  }}
+                                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20"
+                                >
+                                  <Plus size={14} />
+                                  <span>Adicionar</span>
+                                </button>
+                              )}
+
+                              {onDeleteSongFromLibrary && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (confirm(`Remover "${song.title}" da sua biblioteca?`)) {
+                                      onDeleteSongFromLibrary(song.id);
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                                  title="Excluir música da biblioteca"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}

@@ -272,8 +272,8 @@ export const MySongsView: React.FC<MySongsViewProps> = ({
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80 text-xs">
-                <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-800/80 text-xs">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => onOpenSongInStage(song)}
                     className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-zinc-950 font-extrabold flex items-center gap-1"
@@ -290,7 +290,7 @@ export const MySongsView: React.FC<MySongsViewProps> = ({
                   </button>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-wrap shrink-0">
                   {/* Baixar Só Letra */}
                   <button
                     onClick={() => {

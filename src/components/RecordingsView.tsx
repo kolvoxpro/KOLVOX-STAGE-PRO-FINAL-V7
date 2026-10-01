@@ -456,9 +456,9 @@ export const RecordingsView: React.FC<RecordingsViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {/* Mode Switcher */}
-            <div className="flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs">
+            <div className="flex items-center bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs shrink-0">
               <button
                 type="button"
                 onClick={() => setRecordingMode('audio')}
