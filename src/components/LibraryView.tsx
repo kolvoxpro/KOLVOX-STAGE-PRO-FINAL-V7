@@ -125,7 +125,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   };
 
   const handleDeletePlaylist = async (plId: string) => {
-    if (!user || !confirm('Tem certeza que deseja remover esta setlist?')) return;
+    if (!user) return;
     try {
       await deletePlaylist(user.uid, plId);
       setPlaylists((prev) => prev.filter((p) => p.id !== plId));
@@ -139,7 +139,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   };
 
   const handleDeleteSong = async (songId: string) => {
-    if (!user || !confirm('Remover música do seu repertório?')) return;
+    if (!user) return;
     try {
       await deleteSongFromLibrary(user.uid, songId);
       setSongs((prev) => prev.filter((s) => s.id !== songId));
@@ -149,7 +149,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   };
 
   const handleDeleteRecording = async (recId: string) => {
-    if (!user || !confirm('Deseja excluir esta gravação de áudio?')) return;
+    if (!user) return;
     try {
       await deleteRecording(user.uid, recId);
       setRecordings((prev) => prev.filter((r) => r.id !== recId));

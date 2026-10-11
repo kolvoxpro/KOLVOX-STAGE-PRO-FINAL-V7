@@ -24,6 +24,7 @@ import {
   getUserPlaylists,
   getUserRecordings,
   createPlaylist,
+  syncPlaylistToFirestore,
   addSongToPlaylist,
   removeSongFromPlaylist,
   deleteSongFromLibrary,
@@ -249,25 +250,87 @@ export default function App() {
         dbSongs.forEach((s) => songMap.set(s.id, s));
         loadedSongs = Array.from(songMap.values());
 
-        // Merge playlists preserving songs strictly for this account
+        const delPlKey = `kolvox_deleted_playlists_${accountKey}`;
+        let loadedDeletedPlIds: string[] = [];
+        try {
+          const rawDelPl = localStorage.getItem(delPlKey);
+          if (rawDelPl) loadedDeletedPlIds = JSON.parse(rawDelPl);
+        } catch {}
+
+        // Helper to retrieve user-excluded songs for a setlist
+        const getRemovedSongIds = (plId: string): string[] => {
+          try {
+            const raw = localStorage.getItem(`kolvox_removed_songs_${accountKey}_${plId}`);
+            return raw ? JSON.parse(raw) : [];
+          } catch {
+            return [];
+          }
+        };
+
         const plMap = new Map<string, Playlist>();
-        loadedPlaylists.forEach((p) => plMap.set(p.id, p));
+        // Populate local playlists first with excluded songs and deleted playlists filtered out
+        loadedPlaylists.forEach((p) => {
+          if (loadedDeletedPlIds.includes(p.id)) return;
+          const removed = getRemovedSongIds(p.id);
+          const filteredSongs = (p.songs || []).filter((s) => !removed.includes(s.id));
+          plMap.set(p.id, {
+            ...p,
+            songs: filteredSongs,
+            song_count: filteredSongs.length,
+          });
+        });
+
+        // Merge DB playlists, respecting removed items and timestamps
         dbPlaylists.forEach((p) => {
+          if (loadedDeletedPlIds.includes(p.id)) return;
           // Strictly verify that this db playlist belongs to this user account
           if (p.user_email && p.user_email.toLowerCase().trim() !== accountKey) return;
           if (!p.user_email && p.user_id && p.user_id !== uid) return;
 
           const existing = plMap.get(p.id);
-          const mergedSongs = p.songs && p.songs.length > 0 ? p.songs : existing?.songs || [];
+          const removed = getRemovedSongIds(p.id);
+          const cleanDbSongs = (p.songs || []).filter((s) => !removed.includes(s.id));
+
+          let finalSongs: Song[] = [];
+          let finalUpdatedAt = p.updated_at || new Date().toISOString();
+
+          if (existing && existing.songs && existing.songs.length > 0) {
+            const localTime = existing.updated_at ? new Date(existing.updated_at).getTime() : 0;
+            const dbTime = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+
+            if (localTime >= dbTime || cleanDbSongs.length === 0) {
+              finalSongs = existing.songs;
+              finalUpdatedAt = existing.updated_at || new Date().toISOString();
+              // Resync local version to DB in background
+              syncPlaylistToFirestore(uid, {
+                ...p,
+                songs: finalSongs,
+                song_count: finalSongs.length,
+                updated_at: finalUpdatedAt,
+              });
+            } else {
+              finalSongs = cleanDbSongs;
+              finalUpdatedAt = p.updated_at || new Date().toISOString();
+            }
+          } else if (cleanDbSongs.length > 0) {
+            finalSongs = cleanDbSongs;
+          } else if (existing?.songs) {
+            finalSongs = existing.songs;
+          }
+
           plMap.set(p.id, {
             ...p,
             user_id: uid,
             user_email: accountKey,
-            songs: mergedSongs,
-            song_count: mergedSongs.length,
+            songs: finalSongs,
+            song_count: finalSongs.length,
+            updated_at: finalUpdatedAt,
           });
         });
         loadedPlaylists = Array.from(plMap.values());
+        try {
+          localStorage.setItem(userPlaylistsKey, JSON.stringify(loadedPlaylists));
+        } catch {}
         loadedRecordings = dbRecordings;
 
         // STRICT ACCOUNT ISOLATION:
@@ -425,12 +488,17 @@ export default function App() {
   const handleDeletePlaylist = async (playlistId: string, playlistName: string) => {
     const nextPlaylists = playlists.filter((p) => p.id !== playlistId);
     setPlaylists(nextPlaylists);
-    if (user) {
-      const accountKey = (user.email || user.uid || 'guest').toLowerCase().trim();
-      try {
-        localStorage.setItem(`kolvox_user_playlists_${accountKey}`, JSON.stringify(nextPlaylists));
-      } catch {}
-    }
+
+    const accountKey = (user?.email || user?.uid || 'guest').toLowerCase().trim();
+    try {
+      localStorage.setItem(`kolvox_user_playlists_${accountKey}`, JSON.stringify(nextPlaylists));
+      // Track deleted playlist so it never returns on sync or reload!
+      const delPlKey = `kolvox_deleted_playlists_${accountKey}`;
+      const existingDel: string[] = JSON.parse(localStorage.getItem(delPlKey) || '[]');
+      if (!existingDel.includes(playlistId)) {
+        localStorage.setItem(delPlKey, JSON.stringify([...existingDel, playlistId]));
+      }
+    } catch {}
 
     if (selectedPlaylistId === playlistId) {
       setSelectedPlaylistId(nextPlaylists.length > 0 ? nextPlaylists[0].id : null);
@@ -455,9 +523,21 @@ export default function App() {
 
   // Add song to setlist
   const handleAddSongToSetlist = async (playlistId: string, song: Song) => {
+    const accountKey = (user?.email || user?.uid || 'guest').toLowerCase().trim();
+    // Clear song from removed list if it was previously removed
+    try {
+      const removedKey = `kolvox_removed_songs_${accountKey}_${playlistId}`;
+      const existingRemoved: string[] = JSON.parse(localStorage.getItem(removedKey) || '[]');
+      const filtered = existingRemoved.filter((id) => id !== song.id);
+      localStorage.setItem(removedKey, JSON.stringify(filtered));
+    } catch {}
+
     let added = false;
-    setPlaylists((prev) =>
-      prev.map((pl) => {
+    let targetUpdatedPlaylist: Playlist | null = null;
+    let updatedPlaylistsList: Playlist[] = [];
+
+    setPlaylists((prev) => {
+      const next = prev.map((pl) => {
         if (pl.id !== playlistId) return pl;
         const currentSongs = pl.songs || [];
         if (currentSongs.some((s) => s.id === song.id)) {
@@ -466,20 +546,31 @@ export default function App() {
         }
         added = true;
         const updatedSongs = [...currentSongs, song];
-        return {
+        const updatedPl = {
           ...pl,
           songs: updatedSongs,
           song_count: updatedSongs.length,
           updated_at: new Date().toISOString(),
         };
-      })
-    );
+        targetUpdatedPlaylist = updatedPl;
+        return updatedPl;
+      });
+      updatedPlaylistsList = next;
+      return next;
+    });
 
     if (added) {
       showToast(`"${song.title}" adicionada ao setlist!`);
       confetti({ particleCount: 25, spread: 50 });
-      if (user) {
+
+      // Persist immediately to localStorage
+      try {
+        localStorage.setItem(`kolvox_user_playlists_${accountKey}`, JSON.stringify(updatedPlaylistsList));
+      } catch {}
+
+      if (user && targetUpdatedPlaylist) {
         try {
+          await syncPlaylistToFirestore(user.uid, targetUpdatedPlaylist);
           await addSongToPlaylist(user.uid, playlistId, song.id, song);
         } catch (err) {
           console.warn('Silent add song to playlist db:', err);
@@ -490,22 +581,45 @@ export default function App() {
 
   // Remove song from setlist
   const handleRemoveSongFromSetlist = async (playlistId: string, songId: string) => {
-    setPlaylists((prev) =>
-      prev.map((pl) => {
+    const accountKey = (user?.email || user?.uid || 'guest').toLowerCase().trim();
+    // Track removed song so it never returns on sync or reload
+    try {
+      const removedKey = `kolvox_removed_songs_${accountKey}_${playlistId}`;
+      const existingRemoved: string[] = JSON.parse(localStorage.getItem(removedKey) || '[]');
+      if (!existingRemoved.includes(songId)) {
+        localStorage.setItem(removedKey, JSON.stringify([...existingRemoved, songId]));
+      }
+    } catch {}
+
+    let targetUpdatedPlaylist: Playlist | null = null;
+    let nextPlaylists: Playlist[] = [];
+
+    setPlaylists((prev) => {
+      const next = prev.map((pl) => {
         if (pl.id !== playlistId) return pl;
         const updatedSongs = (pl.songs || []).filter((s) => s.id !== songId);
-        return {
+        const updatedPl = {
           ...pl,
           songs: updatedSongs,
           song_count: updatedSongs.length,
           updated_at: new Date().toISOString(),
         };
-      })
-    );
-    showToast('Música removida do setlist.');
+        targetUpdatedPlaylist = updatedPl;
+        return updatedPl;
+      });
+      nextPlaylists = next;
+      return next;
+    });
 
-    if (user) {
+    try {
+      localStorage.setItem(`kolvox_user_playlists_${accountKey}`, JSON.stringify(nextPlaylists));
+    } catch {}
+
+    showToast('Música excluída do setlist com sucesso!');
+
+    if (user && targetUpdatedPlaylist) {
       try {
+        await syncPlaylistToFirestore(user.uid, targetUpdatedPlaylist);
         await removeSongFromPlaylist(user.uid, playlistId, songId);
       } catch (err) {
         console.warn('Silent remove song from playlist db:', err);
@@ -516,6 +630,9 @@ export default function App() {
   // Reorder songs in setlist (Drag & Drop swap/reorder)
   const handleReorderPlaylistSongs = (playlistId: string, fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    let targetUpdatedPlaylist: Playlist | null = null;
+    let updatedPlaylistsList: Playlist[] = [];
+
     setPlaylists((prev) => {
       const next = prev.map((pl) => {
         if (pl.id !== playlistId) return pl;
@@ -523,22 +640,27 @@ export default function App() {
         if (fromIndex >= songs.length || toIndex >= songs.length) return pl;
         const [movedSong] = songs.splice(fromIndex, 1);
         songs.splice(toIndex, 0, movedSong);
-        return {
+        const updatedPl = {
           ...pl,
           songs,
           song_count: songs.length,
           updated_at: new Date().toISOString(),
         };
+        targetUpdatedPlaylist = updatedPl;
+        return updatedPl;
       });
-
-      if (user) {
-        const accountKey = (user.email || user.uid || 'guest').toLowerCase().trim();
-        try {
-          localStorage.setItem(`kolvox_user_playlists_${accountKey}`, JSON.stringify(next));
-        } catch {}
-      }
+      updatedPlaylistsList = next;
       return next;
     });
+
+    const accountKey = (user?.email || user?.uid || 'guest').toLowerCase().trim();
+    try {
+      localStorage.setItem(`kolvox_user_playlists_${accountKey}`, JSON.stringify(updatedPlaylistsList));
+    } catch {}
+
+    if (user && targetUpdatedPlaylist) {
+      syncPlaylistToFirestore(user.uid, targetUpdatedPlaylist);
+    }
 
     showToast('Ordem do repertório atualizada!');
   };
@@ -751,21 +873,32 @@ export default function App() {
       },
     ];
 
+    const accountEmail = (user?.email || user?.uid || 'guest').toLowerCase().trim();
+    let seededPlaylist: Playlist | null = null;
+    let nextPlaylists: Playlist[] = [];
+
     if (targetPlaylistId) {
-      setPlaylists((prev) =>
-        prev.map((pl) => {
+      setPlaylists((prev) => {
+        const next = prev.map((pl) => {
           if (pl.id !== targetPlaylistId) return pl;
-          return {
+          const updated = {
             ...pl,
             songs: defaultSongs,
             song_count: defaultSongs.length,
             updated_at: new Date().toISOString(),
           };
-        })
-      );
+          seededPlaylist = updated;
+          return updated;
+        });
+        nextPlaylists = next;
+        return next;
+      });
+      // Clear removed markers for target playlist
+      try {
+        localStorage.removeItem(`kolvox_removed_songs_${accountEmail}_${targetPlaylistId}`);
+      } catch {}
     } else {
       const newPlId = 'pl_' + Date.now();
-      const accountEmail = (user?.email || user?.uid || 'guest').toLowerCase().trim();
       const newPl: Playlist = {
         id: newPlId,
         user_id: user?.uid || 'guest',
@@ -776,8 +909,21 @@ export default function App() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      setPlaylists((prev) => [newPl, ...prev]);
+      seededPlaylist = newPl;
+      setPlaylists((prev) => {
+        const next = [newPl, ...prev];
+        nextPlaylists = next;
+        return next;
+      });
       setSelectedPlaylistId(newPlId);
+    }
+
+    try {
+      localStorage.setItem(`kolvox_user_playlists_${accountEmail}`, JSON.stringify(nextPlaylists));
+    } catch {}
+
+    if (user && seededPlaylist) {
+      syncPlaylistToFirestore(user.uid, seededPlaylist);
     }
 
     showToast('Repertório "Rock em Replay" carregado com 10 músicas!');
@@ -2046,10 +2192,11 @@ export default function App() {
                               e.stopPropagation();
                               handleDeletePlaylist(pl.id, pl.name);
                             }}
-                            className="btn-delete"
+                            className="btn-delete flex items-center gap-1 shrink-0"
                             title={`Excluir setlist "${pl.name}"`}
                           >
-                            Excluir
+                            <Trash2 className="w-3 h-3 text-rose-400" />
+                            <span>Excluir</span>
                           </button>
                         </div>
                       );
@@ -2076,26 +2223,38 @@ export default function App() {
                       {activeSetlist ? activeSetlist.name : 'Nenhum Setlist Selecionado'}
                     </h3>
                     {activeSetlist && (
-                      <button
-                        type="button"
-                        className="btn-primary"
-                        style={{
-                          background: '#f4f4f5',
-                          color: '#09090b',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          letterSpacing: '0.05em',
-                          padding: '0.55rem 1.15rem',
-                          borderRadius: '4px',
-                          textTransform: 'uppercase',
-                        }}
-                        onClick={() => {
-                          setAddToSetlistTab('global');
-                          setShowAddToSetlistModal(true);
-                        }}
-                      >
-                        + ADICIONAR MÚSICA
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          className="btn-delete flex items-center gap-1.5"
+                          style={{ padding: '0.55rem 0.9rem', fontSize: '0.72rem' }}
+                          onClick={() => handleDeletePlaylist(activeSetlist.id, activeSetlist.name)}
+                          title={`Excluir setlist "${activeSetlist.name}"`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Excluir Setlist</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{
+                            background: '#f4f4f5',
+                            color: '#09090b',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.05em',
+                            padding: '0.55rem 1.15rem',
+                            borderRadius: '4px',
+                            textTransform: 'uppercase',
+                          }}
+                          onClick={() => {
+                            setAddToSetlistTab('global');
+                            setShowAddToSetlistModal(true);
+                          }}
+                        >
+                          + ADICIONAR MÚSICA
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -2180,8 +2339,8 @@ export default function App() {
                               <div className="track-artist">{track.artist}</div>
                             </div>
 
-                            {/* Controles de subir/descer e remover */}
-                            <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            {/* Controles de subir/descer e remover (sempre visíveis e acessíveis) */}
+                            <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 type="button"
                                 disabled={idx === 0}
@@ -2189,7 +2348,7 @@ export default function App() {
                                   e.stopPropagation();
                                   handleMoveSong(activeSetlist.id, idx, idx - 1);
                                 }}
-                                className="w-6 h-6 rounded flex items-center justify-center bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed text-[10px] transition-colors"
+                                className="w-6.5 h-6.5 rounded flex items-center justify-center bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 disabled:opacity-20 disabled:cursor-not-allowed text-[11px] transition-colors cursor-pointer"
                                 title="Subir na ordem"
                               >
                                 ▲
@@ -2201,7 +2360,7 @@ export default function App() {
                                   e.stopPropagation();
                                   handleMoveSong(activeSetlist.id, idx, idx + 1);
                                 }}
-                                className="w-6 h-6 rounded flex items-center justify-center bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed text-[10px] transition-colors"
+                                className="w-6.5 h-6.5 rounded flex items-center justify-center bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 disabled:opacity-20 disabled:cursor-not-allowed text-[11px] transition-colors cursor-pointer"
                                 title="Descer na ordem"
                               >
                                 ▼
@@ -2212,10 +2371,11 @@ export default function App() {
                                   e.stopPropagation();
                                   handleRemoveSongFromSetlist(activeSetlist.id, track.id);
                                 }}
-                                className="w-7 h-7 rounded flex items-center justify-center bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-rose-400 hover:border-rose-500/40 text-xs transition-colors ml-1"
-                                title="Remover deste setlist"
+                                className="h-6.5 px-2 sm:px-2.5 rounded flex items-center gap-1 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 hover:border-rose-500 text-rose-300 hover:text-rose-100 text-[11px] font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
+                                title={`Excluir "${track.title}" deste setlist`}
                               >
-                                🗑
+                                <Trash2 className="w-3 h-3 text-rose-400 shrink-0" />
+                                <span className="hidden sm:inline">Excluir</span>
                               </button>
                             </div>
 

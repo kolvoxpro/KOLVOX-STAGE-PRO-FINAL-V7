@@ -10,6 +10,7 @@ import {
   query,
   orderBy,
   limit,
+  where,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Song, Playlist, PlaylistSongItem, Recording, SearchHistory, ActivityLog } from '../types/kolvox';
@@ -120,14 +121,18 @@ export async function deleteSongFromLibrary(userId: string, songId: string): Pro
 }
 
 // Playlists (Setlists)
-export async function createPlaylist(userId: string, name: string, userEmail?: string): Promise<Playlist> {
+export async function createPlaylist(userId: string, name: string, userEmail?: string, customId?: string): Promise<Playlist> {
   const cleanEmail = (userEmail || '').toLowerCase().trim();
-  const colRef = collection(db, 'users', userId, 'playlists');
   const now = new Date().toISOString();
-  const docRef = await addDoc(colRef, {
+  const playlistId = customId || 'pl_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+  const docRef = doc(db, 'users', userId, 'playlists', playlistId);
+  await setDoc(docRef, {
+    id: playlistId,
     user_id: userId,
     user_email: cleanEmail,
     name: name.trim(),
+    songs: [],
+    song_count: 0,
     created_at: now,
     updated_at: now,
   });
@@ -135,7 +140,7 @@ export async function createPlaylist(userId: string, name: string, userEmail?: s
   await logUserActivity(userId, 'CREATE_PLAYLIST', `Setlist: ${name}`);
 
   return {
-    id: docRef.id,
+    id: playlistId,
     user_id: userId,
     user_email: cleanEmail,
     name: name.trim(),
@@ -146,6 +151,42 @@ export async function createPlaylist(userId: string, name: string, userEmail?: s
   };
 }
 
+export async function syncPlaylistToFirestore(userId: string, playlist: Playlist): Promise<void> {
+  if (!userId || userId === 'guest' || !playlist?.id) return;
+  try {
+    const docRef = doc(db, 'users', userId, 'playlists', playlist.id);
+    const cleanSongs = (playlist.songs || []).map((s) => ({
+      id: s.id,
+      user_id: s.user_id || userId,
+      title: s.title || '',
+      artist: s.artist || '',
+      lyrics: s.lyrics || '',
+      key_signature: s.key_signature || '',
+      source: s.source || 'Setlist',
+      cover_url: s.cover_url || '',
+      created_at: s.created_at || new Date().toISOString(),
+      updated_at: s.updated_at || new Date().toISOString(),
+    }));
+
+    await setDoc(
+      docRef,
+      {
+        id: playlist.id,
+        user_id: userId,
+        user_email: (playlist.user_email || '').toLowerCase().trim(),
+        name: playlist.name || 'Setlist',
+        songs: cleanSongs,
+        song_count: cleanSongs.length,
+        updated_at: playlist.updated_at || new Date().toISOString(),
+        created_at: playlist.created_at || new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Error syncing playlist to Firestore:', err);
+  }
+}
+
 export async function getUserPlaylists(userId: string, userEmail?: string): Promise<Playlist[]> {
   if (!userId || userId === 'guest') return [];
   try {
@@ -153,33 +194,53 @@ export async function getUserPlaylists(userId: string, userEmail?: string): Prom
     const q = query(colRef, orderBy('created_at', 'desc'));
     const snap = await getDocs(q);
     const cleanEmail = (userEmail || '').toLowerCase().trim();
-    
+
     const playlists: Playlist[] = [];
     for (const docSnap of snap.docs) {
-      const pData = docSnap.data() as Omit<Playlist, 'id'>;
+      const pData = docSnap.data() as Omit<Playlist, 'id'> & { songs?: Song[] };
       // Guarantee isolation: ignore playlists belonging to another email
       if (cleanEmail && pData.user_email && pData.user_email.toLowerCase().trim() !== cleanEmail) {
         continue;
       }
-      // Get count and items of songs
+
+      // Prioritize songs array directly on playlist document
       let songs: Song[] = [];
-      try {
-        const songsSnap = await getDocs(collection(db, 'users', userId, 'playlists', docSnap.id, 'songs'));
-        songs = songsSnap.docs.map((sDoc) => {
-          const sData = sDoc.data();
-          return {
-            id: sData.song_id || sDoc.id,
-            user_id: userId,
-            title: sData.title || '',
-            artist: sData.artist || '',
-            lyrics: sData.lyrics || '',
-            key_signature: sData.key || sData.key_signature || '',
-            source: 'Setlist',
-            created_at: sData.created_at || '',
-            updated_at: sData.created_at || '',
-          };
-        });
-      } catch {}
+      if (Array.isArray(pData.songs) && pData.songs.length > 0) {
+        songs = pData.songs.map((s) => ({
+          id: s.id,
+          user_id: s.user_id || userId,
+          title: s.title || '',
+          artist: s.artist || '',
+          lyrics: s.lyrics || '',
+          key_signature: s.key_signature || '',
+          source: s.source || 'Setlist',
+          cover_url: s.cover_url || '',
+          created_at: s.created_at || '',
+          updated_at: s.updated_at || '',
+        }));
+      } else {
+        // Fallback to subcollection for legacy items
+        try {
+          const songsSnap = await getDocs(collection(db, 'users', userId, 'playlists', docSnap.id, 'songs'));
+          if (!songsSnap.empty) {
+            songs = songsSnap.docs.map((sDoc) => {
+              const sData = sDoc.data();
+              return {
+                id: sData.song_id || sDoc.id,
+                user_id: userId,
+                title: sData.title || '',
+                artist: sData.artist || '',
+                lyrics: sData.lyrics || '',
+                key_signature: sData.key || sData.key_signature || '',
+                source: 'Setlist',
+                cover_url: sData.cover_url || '',
+                created_at: sData.created_at || '',
+                updated_at: sData.created_at || '',
+              };
+            });
+          }
+        } catch {}
+      }
 
       playlists.push({
         id: docSnap.id,
@@ -196,58 +257,161 @@ export async function getUserPlaylists(userId: string, userEmail?: string): Prom
   }
 }
 
-export async function addSongToPlaylist(userId: string, playlistId: string, songId: string, song: Song): Promise<void> {
-  const songsColRef = collection(db, 'users', userId, 'playlists', playlistId, 'songs');
-  const snap = await getDocs(songsColRef);
-  const position = snap.size + 1;
-
-  await addDoc(songsColRef, {
-    playlist_id: playlistId,
-    song_id: songId,
-    position,
-    title: song.title,
-    artist: song.artist,
-    lyrics: song.lyrics,
-    created_at: new Date().toISOString(),
-  });
-
-  await logUserActivity(userId, 'ADD_TO_SETLIST', `Música: ${song.title} na Setlist ID: ${playlistId}`);
-}
-
 export async function getPlaylistSongs(userId: string, playlistId: string): Promise<PlaylistSongItem[]> {
+  if (!userId || userId === 'guest') return [];
   try {
+    const plDocRef = doc(db, 'users', userId, 'playlists', playlistId);
+    const plSnap = await getDoc(plDocRef);
+    if (plSnap.exists()) {
+      const pData = plSnap.data();
+      const songs: Song[] = Array.isArray(pData.songs) ? pData.songs : [];
+      if (songs.length > 0) {
+        return songs.map((s, idx) => ({
+          id: s.id,
+          playlist_id: playlistId,
+          song_id: s.id,
+          position: idx + 1,
+          song: s,
+        }));
+      }
+    }
+
     const songsColRef = collection(db, 'users', userId, 'playlists', playlistId, 'songs');
     const snap = await getDocs(songsColRef);
-    return snap.docs.map(d => {
-      const data = d.data();
-      return {
-        id: d.id,
-        playlist_id: playlistId,
-        song_id: data.song_id,
-        position: data.position || 0,
-        song: {
-          id: data.song_id,
-          user_id: userId,
-          title: data.title || '',
-          artist: data.artist || '',
-          lyrics: data.lyrics || '',
-          source: 'Setlist',
-          created_at: data.created_at || '',
-          updated_at: data.created_at || '',
-        },
-      };
-    }).sort((a, b) => a.position - b.position);
+    return snap.docs
+      .map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          playlist_id: playlistId,
+          song_id: data.song_id || d.id,
+          position: data.position || 0,
+          song: {
+            id: data.song_id || d.id,
+            user_id: userId,
+            title: data.title || '',
+            artist: data.artist || '',
+            lyrics: data.lyrics || '',
+            key_signature: data.key || data.key_signature || '',
+            source: 'Setlist',
+            created_at: data.created_at || '',
+            updated_at: data.created_at || '',
+          },
+        };
+      })
+      .sort((a, b) => a.position - b.position);
   } catch (err) {
     console.error('Error getting playlist songs:', err);
     return [];
   }
 }
 
+export async function addSongToPlaylist(userId: string, playlistId: string, songId: string, song: Song): Promise<void> {
+  if (!userId || userId === 'guest') return;
+  try {
+    const cleanSong: Song = {
+      id: song.id || songId,
+      user_id: song.user_id || userId,
+      title: song.title || '',
+      artist: song.artist || '',
+      lyrics: song.lyrics || '',
+      key_signature: song.key_signature || '',
+      source: song.source || 'Setlist',
+      cover_url: song.cover_url || '',
+      created_at: song.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // 1. Update parent playlist document's songs array atomically
+    const plDocRef = doc(db, 'users', userId, 'playlists', playlistId);
+    const plSnap = await getDoc(plDocRef);
+    if (plSnap.exists()) {
+      const pData = plSnap.data() as { songs?: Song[] };
+      const currentSongs = Array.isArray(pData.songs) ? pData.songs : [];
+      if (!currentSongs.some((s) => s.id === cleanSong.id)) {
+        const nextSongs = [...currentSongs, cleanSong];
+        await setDoc(
+          plDocRef,
+          {
+            songs: nextSongs,
+            song_count: nextSongs.length,
+            updated_at: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      }
+    } else {
+      await setDoc(
+        plDocRef,
+        {
+          id: playlistId,
+          user_id: userId,
+          songs: [cleanSong],
+          song_count: 1,
+          updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    }
+
+    // 2. Also save to subcollection with deterministic doc id
+    const songDocRef = doc(db, 'users', userId, 'playlists', playlistId, 'songs', cleanSong.id);
+    await setDoc(songDocRef, {
+      playlist_id: playlistId,
+      song_id: cleanSong.id,
+      title: cleanSong.title,
+      artist: cleanSong.artist,
+      lyrics: cleanSong.lyrics,
+      key_signature: cleanSong.key_signature || '',
+      cover_url: cleanSong.cover_url || '',
+      created_at: new Date().toISOString(),
+    });
+
+    await logUserActivity(userId, 'ADD_TO_SETLIST', `Música: ${cleanSong.title} na Setlist ID: ${playlistId}`);
+  } catch (err) {
+    console.warn('Error adding song to playlist in Firestore:', err);
+  }
+}
+
 export async function removeSongFromPlaylist(userId: string, playlistId: string, itemSongId: string): Promise<void> {
   if (!userId || userId === 'guest') return;
   try {
-    const docRef = doc(db, 'users', userId, 'playlists', playlistId, 'songs', itemSongId);
-    await deleteDoc(docRef);
+    // 1. Update parent playlist document's songs array atomically
+    const plDocRef = doc(db, 'users', userId, 'playlists', playlistId);
+    const plSnap = await getDoc(plDocRef);
+    if (plSnap.exists()) {
+      const pData = plSnap.data() as { songs?: Song[] };
+      const currentSongs = Array.isArray(pData.songs) ? pData.songs : [];
+      const updatedSongs = currentSongs.filter((s) => s.id !== itemSongId);
+      await setDoc(
+        plDocRef,
+        {
+          songs: updatedSongs,
+          song_count: updatedSongs.length,
+          updated_at: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    }
+
+    // 2. Remove from subcollection by direct doc ID
+    try {
+      const directRef = doc(db, 'users', userId, 'playlists', playlistId, 'songs', itemSongId);
+      await deleteDoc(directRef);
+    } catch {}
+
+    // 3. Remove by song_id query in subcollection to ensure complete purge
+    try {
+      const subColRef = collection(db, 'users', userId, 'playlists', playlistId, 'songs');
+      const q = query(subColRef, where('song_id', '==', itemSongId));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        await deleteDoc(d.ref);
+      }
+    } catch {}
+
+    await logUserActivity(userId, 'REMOVE_FROM_SETLIST', `Música ID: ${itemSongId} da Setlist ID: ${playlistId}`);
   } catch (err) {
     console.warn('Error removing song from playlist in Firestore:', err);
   }

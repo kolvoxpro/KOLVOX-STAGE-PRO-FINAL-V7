@@ -739,9 +739,7 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    if (confirm(`Remover "${song.title}" da sua biblioteca?`)) {
-                                      onDeleteSongFromLibrary(song.id);
-                                    }
+                                    onDeleteSongFromLibrary(song.id);
                                   }}
                                   className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors cursor-pointer"
                                   title="Excluir música da biblioteca"
