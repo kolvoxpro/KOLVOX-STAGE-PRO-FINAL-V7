@@ -25,6 +25,8 @@ export interface Song {
   bpm?: number;
   duration?: string;
   lyrics?: string;
+  syncedLyrics?: string;
+  previewUrl?: string;
   chords?: string;
   tabs?: string;
   sheetMusic?: string;

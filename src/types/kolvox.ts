@@ -14,6 +14,9 @@ export interface Song {
   title: string;
   artist: string;
   lyrics: string;
+  synced_lyrics?: string;
+  audio_url?: string;
+  preview_url?: string;
   source: string;
   source_song_id?: string;
   cover_url?: string;

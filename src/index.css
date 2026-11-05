@@ -2248,6 +2248,7 @@ button {
 }
 
 .lyrics {
+  position: relative;
   height: 100%;
   overflow-y: auto;
   padding: 40px 20px;

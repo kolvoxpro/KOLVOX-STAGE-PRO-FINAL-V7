@@ -388,6 +388,71 @@ export class AuthorizedMusicProvider implements IMusicSearchProvider {
 
     return null;
   }
+
+  /**
+   * Retrieves synchronized LRC lyrics and exact original studio duration.
+   */
+  async getSyncedLyricsData(
+    title: string,
+    artist: string
+  ): Promise<{ syncedLyrics?: string; plainLyrics?: string; duration?: number } | null> {
+    try {
+      const url = `https://lrclib.net/api/get?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      const res = await fetch(url, {
+        headers: { 'User-Agent': this.userAgent },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.syncedLyrics || data?.plainLyrics) {
+          return {
+            syncedLyrics: data.syncedLyrics || undefined,
+            plainLyrics: data.plainLyrics || undefined,
+            duration: typeof data.duration === 'number' && data.duration > 0 ? Math.round(data.duration) : undefined,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('LRCLIB direct synced get failed:', e);
+    }
+
+    try {
+      const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(`${title} ${artist}`)}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
+      const res = await fetch(searchUrl, {
+        headers: { 'User-Agent': this.userAgent },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list) && list.length > 0) {
+          for (const item of list) {
+            if (matchesArtist(item.artistName || '', artist)) {
+              if (item.syncedLyrics || item.plainLyrics) {
+                return {
+                  syncedLyrics: item.syncedLyrics || undefined,
+                  plainLyrics: item.plainLyrics || undefined,
+                  duration: typeof item.duration === 'number' && item.duration > 0 ? Math.round(item.duration) : undefined,
+                };
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('LRCLIB synced search fallback failed:', e);
+    }
+
+    return null;
+  }
 }
 
 export const musicSearchProvider = new AuthorizedMusicProvider();

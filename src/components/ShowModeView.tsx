@@ -1,10 +1,31 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Song, Recording } from '../types/kolvox';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { saveRecording } from '../services/DatabaseService';
 import { useAuth } from '../context/AuthContext';
+import { musicSearchProvider } from '../services/MusicSearchProvider';
+import {
+  parseLrcToKaraokeTimeline,
+  generateSmartKaraokeTimeline,
+  getKaraokeState,
+  formatKaraokeTime,
+  hasLrcTimestamps,
+  KaraokeItem,
+} from '../utils/karaokeTimeline';
 import confetti from 'canvas-confetti';
-import { Check, Mic, AlertCircle, Volume2, RefreshCw, X, SkipForward, SkipBack, Zap, Clock, Activity, Sliders } from 'lucide-react';
+import {
+  Check,
+  Mic,
+  Volume2,
+  RefreshCw,
+  X,
+  SkipForward,
+  SkipBack,
+  Zap,
+  Sliders,
+  Music,
+  RotateCcw,
+} from 'lucide-react';
 import showRolandoSingerImg from '../assets/images/show_cantor_cap_1789915458182.jpg';
 import { KolvoxLogo } from './KolvoxLogo';
 
@@ -31,35 +52,35 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
 }) => {
   const { user } = useAuth();
 
-  // Playback & Auto-scroll State
+  // Playback & Timing State
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [speed, setSpeed] = useState<number>(1.0);
+  const [speed, setSpeed] = useState<number>(1.0); // 1.0 = Original Studio Tempo
   const [fontSize, setFontSize] = useState<number>(26);
-  const [scrollProgress, setScrollProgress] = useState<number>(0);
-  const [activeLineIndex, setActiveLineIndex] = useState<number>(0);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [isKaraokeMode, setIsKaraokeMode] = useState<boolean>(true); // Active by default!
+  const [isSyncingLrc, setIsSyncingLrc] = useState<boolean>(false);
   const [savedRecordingToast, setSavedRecordingToast] = useState<string | null>(null);
   const [showMicPermissionModal, setShowMicPermissionModal] = useState<boolean>(false);
   const [micErrorMessage, setMicErrorMessage] = useState<string>('');
 
-  // Real-time Song Tempo & BPM Sync State
-  const defaultDuration = React.useMemo(() => {
+  // Song duration extraction
+  const defaultDuration = useMemo(() => {
     if (song.duration) {
-      if (typeof song.duration === 'number' && song.duration > 0) return song.duration;
+      if (typeof song.duration === 'number' && song.duration > 0) return Math.round(song.duration);
       if (typeof song.duration === 'string') {
         const parts = song.duration.split(':').map(Number);
         if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
           return parts[0] * 60 + parts[1];
         }
         const parsed = Number(song.duration);
-        if (!isNaN(parsed) && parsed > 0) return parsed;
+        if (!isNaN(parsed) && parsed > 0) return Math.round(parsed);
       }
     }
     return 210; // Default 3m30s
   }, [song.duration]);
 
-  const [isRealTempoMode, setIsRealTempoMode] = useState<boolean>(false);
-  const [customDurationSeconds, setCustomDurationSeconds] = useState<number>(defaultDuration);
-  const [songBpm, setSongBpm] = useState<number>(song.bpm || 120);
+  const [customDuration, setCustomDuration] = useState<number>(defaultDuration);
+  const [songBpm, setSongBpm] = useState<number>(song.bpm || 115);
   const [showTempoModal, setShowTempoModal] = useState<boolean>(false);
 
   // Audio Recording
@@ -68,20 +89,30 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
     recordingTime,
     startRecording,
     stopRecording,
-    isUsingFallback,
   } = useAudioRecorder();
 
   // DOM Refs
   const lyricsContainerRef = useRef<HTMLDivElement | null>(null);
+  const activeLineElementRef = useRef<HTMLDivElement | null>(null);
+  const lineElementsRef = useRef<(HTMLDivElement | null)[]>([]);
   const animationFrameRef = useRef<number | null>(null);
-  const scrollAccRef = useRef<number>(0);
+  const lastTimestampRef = useRef<number>(performance.now());
   const isPlayingRef = useRef<boolean>(false);
   const speedRef = useRef<number>(speed);
-  const isRealTempoRef = useRef<boolean>(isRealTempoMode);
-  const customDurationRef = useRef<number>(customDurationSeconds);
+  const isKaraokeModeRef = useRef<boolean>(isKaraokeMode);
+
+  // Synchronization refs for smooth frame-by-frame auto-scroll
+  const currentTimeRef = useRef<number>(currentTime);
+  const totalDurationRef = useRef<number>(defaultDuration);
+  const timelineRef = useRef<KaraokeItem[]>([]);
+  const isUserInteractingRef = useRef<boolean>(false);
+  const userInteractionTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
+    if (isPlaying) {
+      lastTimestampRef.current = performance.now();
+    }
   }, [isPlaying]);
 
   useEffect(() => {
@@ -89,135 +120,229 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
   }, [speed]);
 
   useEffect(() => {
-    isRealTempoRef.current = isRealTempoMode;
-  }, [isRealTempoMode]);
+    isKaraokeModeRef.current = isKaraokeMode;
+  }, [isKaraokeMode]);
 
   useEffect(() => {
-    customDurationRef.current = customDurationSeconds;
-  }, [customDurationSeconds]);
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    return () => {
+      if (userInteractionTimeoutRef.current) {
+        window.clearTimeout(userInteractionTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Next / Previous song in setlist calculation
   const hasPlaylist = Boolean(playlist && playlist.songs && playlist.songs.length > 0);
-  const nextSong = React.useMemo(() => {
+  const nextSong = useMemo(() => {
     if (!hasPlaylist || !playlist) return null;
     const nextIdx = (playlist.currentIndex + 1) % playlist.songs.length;
     return playlist.songs[nextIdx];
   }, [hasPlaylist, playlist]);
 
-  const prevSong = React.useMemo(() => {
+  const prevSong = useMemo(() => {
     if (!hasPlaylist || !playlist) return null;
     const prevIdx = (playlist.currentIndex - 1 + playlist.songs.length) % playlist.songs.length;
     return playlist.songs[prevIdx];
   }, [hasPlaylist, playlist]);
 
-  const handleNextSong = () => {
-    if (nextSong && onSelectSong) {
-      onSelectSong(nextSong);
-      if (lyricsContainerRef.current) {
-        lyricsContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
-      }
-      setScrollProgress(0);
-      setActiveLineIndex(0);
-      setSavedRecordingToast(`Próxima música: ${nextSong.title}`);
-      setTimeout(() => setSavedRecordingToast(null), 2500);
-    }
-  };
+  // Karaoke Timeline Building
+  const [rawLrcText, setRawLrcText] = useState<string>(song.synced_lyrics || '');
 
-  const handlePrevSong = () => {
-    if (prevSong && onSelectSong) {
-      onSelectSong(prevSong);
-      if (lyricsContainerRef.current) {
-        lyricsContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
-      }
-      setScrollProgress(0);
-      setActiveLineIndex(0);
-      setSavedRecordingToast(`Música anterior: ${prevSong.title}`);
-      setTimeout(() => setSavedRecordingToast(null), 2500);
-    }
-  };
+  // Fetch verified synchronized LRC from LRCLIB if not present
+  useEffect(() => {
+    let isCancelled = false;
 
-  // Split lyrics into lines/paragraphs - strictly authentic text
-  const lines = React.useMemo(() => {
-    if (!song.lyrics || song.lyrics.trim().length === 0) {
-      return [
-        '(Letra oficial não cadastrada para esta música)',
-        'Para adicionar a letra oficial do cantor, clique em Editar Música na Biblioteca.'
-      ];
-    }
-    return song.lyrics
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0);
-  }, [song.lyrics]);
-
-  // Update progress bar on scroll
-  const handleScrollUpdate = useCallback(() => {
-    const el = lyricsContainerRef.current;
-    if (!el) return;
-    const maxScroll = el.scrollHeight - el.clientHeight;
-    if (maxScroll <= 0) {
-      setScrollProgress(0);
+    // Check if song already has timestamps in lyrics or synced_lyrics
+    if (hasLrcTimestamps(song.synced_lyrics || '') || hasLrcTimestamps(song.lyrics || '')) {
+      setRawLrcText(song.synced_lyrics || song.lyrics);
       return;
     }
-    const current = el.scrollTop;
-    const pct = Math.min(100, Math.max(0, (current / maxScroll) * 100));
-    setScrollProgress(pct);
 
-    // Calculate approximate active line
-    const approxLine = Math.floor((current / maxScroll) * lines.length);
-    setActiveLineIndex(approxLine);
-  }, [lines.length]);
-
-  // Auto-scroll loop
-  const autoScrollStep = useCallback(() => {
-    if (isPlayingRef.current && lyricsContainerRef.current) {
-      const container = lyricsContainerRef.current;
-      const maxScroll = container.scrollHeight - container.clientHeight;
-
-      if (container.scrollTop >= maxScroll - 2) {
-        setIsPlaying(false);
-      } else {
-        let pxPerFrame: number;
-        if (isRealTempoRef.current) {
-          // Exact sync with real duration of the song
-          const targetDuration = Math.max(20, customDurationRef.current || 210);
-          const pxPerSec = maxScroll / targetDuration;
-          pxPerFrame = (pxPerSec * speedRef.current) / 60;
-        } else {
-          const basePxPerSec = 45;
-          pxPerFrame = (basePxPerSec * speedRef.current) / 60;
+    // Attempt to query LRCLIB for the exact original studio timestamps
+    const fetchLrcData = async () => {
+      setIsSyncingLrc(true);
+      try {
+        const result = await musicSearchProvider.getSyncedLyricsData(song.title, song.artist);
+        if (!isCancelled && result) {
+          if (result.syncedLyrics && hasLrcTimestamps(result.syncedLyrics)) {
+            setRawLrcText(result.syncedLyrics);
+            if (result.duration && result.duration > 30) {
+              setCustomDuration(result.duration);
+            }
+          } else if (result.duration && result.duration > 30) {
+            setCustomDuration(result.duration);
+          }
         }
-        scrollAccRef.current += pxPerFrame;
-
-        if (scrollAccRef.current >= 1) {
-          const moveBy = Math.floor(scrollAccRef.current);
-          container.scrollTop += moveBy;
-          scrollAccRef.current -= moveBy;
-          handleScrollUpdate();
+      } catch (err) {
+        console.warn('Silent synced lyrics fetch notice:', err);
+      } finally {
+        if (!isCancelled) {
+          setIsSyncingLrc(false);
         }
       }
-    }
+    };
 
-    if (isPlayingRef.current) {
-      animationFrameRef.current = requestAnimationFrame(autoScrollStep);
+    fetchLrcData();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [song.id, song.title, song.artist, song.lyrics, song.synced_lyrics]);
+
+  // Generate parsed timeline
+  const { timeline, cleanLines, totalDuration } = useMemo(() => {
+    const hasTimestamps = hasLrcTimestamps(rawLrcText) || hasLrcTimestamps(song.lyrics);
+    const textToParse = hasTimestamps
+      ? (hasLrcTimestamps(rawLrcText) ? rawLrcText : song.lyrics)
+      : (song.lyrics || '');
+
+    if (hasTimestamps) {
+      return parseLrcToKaraokeTimeline(textToParse, customDuration);
+    } else {
+      return generateSmartKaraokeTimeline(textToParse, customDuration, songBpm);
     }
-  }, [handleScrollUpdate]);
+  }, [rawLrcText, song.lyrics, customDuration, songBpm]);
 
   useEffect(() => {
-    if (isPlaying) {
-      animationFrameRef.current = requestAnimationFrame(autoScrollStep);
-    } else {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
+    timelineRef.current = timeline;
+  }, [timeline]);
+
+  useEffect(() => {
+    totalDurationRef.current = totalDuration;
+  }, [totalDuration]);
+
+  useEffect(() => {
+    lineElementsRef.current = lineElementsRef.current.slice(0, cleanLines.length);
+  }, [cleanLines]);
+
+  // Current Karaoke State
+  const karaokeState = useMemo(() => {
+    return getKaraokeState(timeline, currentTime, totalDuration);
+  }, [timeline, currentTime, totalDuration]);
+
+  // Auto-scroll when paused (scrubbing or jumping)
+  useEffect(() => {
+    if (!isPlaying && lyricsContainerRef.current && !isUserInteractingRef.current) {
+      const idx = karaokeState.activeLineIndex;
+      const targetEl = lineElementsRef.current[idx];
+      const container = lyricsContainerRef.current;
+      if (targetEl && container) {
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        const targetScrollContentY = targetRect.top - containerRect.top + container.scrollTop;
+        const targetScroll = Math.max(
+          0,
+          targetScrollContentY - container.clientHeight * 0.36
+        );
+        container.scrollTo({
+          top: targetScroll,
+          behavior: 'smooth',
+        });
       }
     }
+  }, [isPlaying, karaokeState.activeLineIndex]);
+
+  // Main playback timer loop (Tempo Original com Auto-Scroll Contínuo Subindo em Tempo Real)
+  useEffect(() => {
+    const updatePlayback = (now: number) => {
+      if (isPlayingRef.current) {
+        const deltaSeconds = (now - lastTimestampRef.current) / 1000;
+        lastTimestampRef.current = now;
+
+        if (deltaSeconds > 0 && deltaSeconds < 1.0) {
+          const currentT = currentTimeRef.current;
+          const nextTime = Math.min(
+            totalDurationRef.current,
+            currentT + deltaSeconds * speedRef.current
+          );
+          currentTimeRef.current = nextTime;
+          setCurrentTime(nextTime);
+
+          if (nextTime >= totalDurationRef.current) {
+            setIsPlaying(false);
+          }
+
+          // Teleprompter / Karaokê: Auto-Scroll Contínuo Subindo Conforme a Letra Passa
+          const container = lyricsContainerRef.current;
+          if (container && !isUserInteractingRef.current && timelineRef.current.length > 0) {
+            const currentState = getKaraokeState(
+              timelineRef.current,
+              nextTime,
+              totalDurationRef.current
+            );
+            const idx = currentState.activeLineIndex;
+            const curEl = lineElementsRef.current[idx];
+
+            if (curEl) {
+              const containerRect = container.getBoundingClientRect();
+              const curRect = curEl.getBoundingClientRect();
+              // Posição absoluta da linha atual no conteúdo com scroll
+              const curTop = curRect.top - containerRect.top + container.scrollTop;
+
+              const nextEl = lineElementsRef.current[idx + 1];
+              let nextTop: number;
+              if (nextEl) {
+                const nextRect = nextEl.getBoundingClientRect();
+                nextTop = nextRect.top - containerRect.top + container.scrollTop;
+              } else {
+                nextTop = curTop + curEl.offsetHeight + 28;
+              }
+
+              let fraction = 0;
+              if (currentState.isPause) {
+                // Durante a introdução instrumental, nos últimos 4s aproxima suavemente do 1º verso
+                if (currentState.pauseCountdown <= 4 && currentState.pauseTotalDuration > 0) {
+                  const remaining = Math.max(0, currentState.pauseCountdown);
+                  fraction = ((4 - remaining) / 4) * 0.15;
+                }
+              } else {
+                fraction = Math.max(0, Math.min(1, currentState.lineProgress / 100));
+              }
+
+              // Ponto focal interpola continuamente entre a linha atual e a próxima a cada milissegundo
+              const targetY = curTop + (nextTop - curTop) * fraction;
+              const desiredScrollTop = Math.max(
+                0,
+                targetY - container.clientHeight * 0.36
+              );
+
+              const currentScroll = container.scrollTop;
+              const diff = desiredScrollTop - currentScroll;
+
+              if (Math.abs(diff) > 0.2) {
+                // Deslize contínuo a 60fps (lerp 0.22 para fluidez máxima da subida)
+                container.scrollTop = currentScroll + diff * 0.22;
+              }
+            }
+          }
+        }
+      } else {
+        lastTimestampRef.current = now;
+      }
+
+      if (isPlayingRef.current) {
+        animationFrameRef.current = requestAnimationFrame(updatePlayback);
+      }
+    };
+
+    if (isPlaying) {
+      lastTimestampRef.current = performance.now();
+      animationFrameRef.current = requestAnimationFrame(updatePlayback);
+    } else if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isPlaying, autoScrollStep]);
+  }, [isPlaying]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -227,49 +352,104 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
         setIsPlaying((prev) => !prev);
       } else if (e.code === 'ArrowUp') {
         e.preventDefault();
-        setSpeed((prev) => Math.min(3.0, +(prev + 0.25).toFixed(2)));
+        setSpeed((prev) => Math.min(2.0, +(prev + 0.25).toFixed(2)));
       } else if (e.code === 'ArrowDown') {
         e.preventDefault();
-        setSpeed((prev) => Math.max(0.25, +(prev - 0.25).toFixed(2)));
+        setSpeed((prev) => Math.max(0.5, +(prev - 0.25).toFixed(2)));
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        setCurrentTime((prev) => Math.max(0, prev - 5));
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        setCurrentTime((prev) => Math.min(totalDuration, prev + 5));
       } else if (e.code === 'Escape') {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, totalDuration]);
 
-  const toggleLyrics = () => {
+  const handleNextSong = () => {
+    if (nextSong && onSelectSong) {
+      onSelectSong(nextSong);
+      setCurrentTime(0);
+      setIsPlaying(false);
+      setSavedRecordingToast(`Próxima música: ${nextSong.title}`);
+      setTimeout(() => setSavedRecordingToast(null), 2500);
+    }
+  };
+
+  const handlePrevSong = () => {
+    if (prevSong && onSelectSong) {
+      onSelectSong(prevSong);
+      setCurrentTime(0);
+      setIsPlaying(false);
+      setSavedRecordingToast(`Música anterior: ${prevSong.title}`);
+      setTimeout(() => setSavedRecordingToast(null), 2500);
+    }
+  };
+
+  const togglePlayback = () => {
+    isUserInteractingRef.current = false;
     setIsPlaying((prev) => !prev);
   };
 
-  const lyricsStart = () => {
+  const handleUserInteraction = () => {
+    isUserInteractingRef.current = true;
+    if (userInteractionTimeoutRef.current) {
+      window.clearTimeout(userInteractionTimeoutRef.current);
+    }
+    userInteractionTimeoutRef.current = window.setTimeout(() => {
+      isUserInteractingRef.current = false;
+    }, 1200);
+  };
+
+  const handleRewindToStart = () => {
+    isUserInteractingRef.current = false;
+    currentTimeRef.current = 0;
+    setCurrentTime(0);
     if (lyricsContainerRef.current) {
       lyricsContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      setScrollProgress(0);
-      setActiveLineIndex(0);
     }
   };
 
-  const lyricsEnd = () => {
-    if (lyricsContainerRef.current) {
-      const maxScroll =
-        lyricsContainerRef.current.scrollHeight - lyricsContainerRef.current.clientHeight;
-      lyricsContainerRef.current.scrollTo({ top: maxScroll, behavior: 'smooth' });
-      setScrollProgress(100);
-      setActiveLineIndex(lines.length - 1);
-    }
-  };
-
-  const changeSpeed = (delta: number) => {
-    setSpeed((prev) => {
-      const next = Math.max(0.25, Math.min(3.0, +(prev + delta).toFixed(2)));
+  const handleSkipTime = (delta: number) => {
+    isUserInteractingRef.current = false;
+    setCurrentTime((prev) => {
+      const next = Math.max(0, Math.min(totalDuration, prev + delta));
+      currentTimeRef.current = next;
       return next;
     });
   };
 
+  const handleJumpToLine = (lineIdx: number) => {
+    const targetItem = timeline.find((item) => item.type === 'line' && item.lineIndex === lineIdx);
+    if (targetItem) {
+      isUserInteractingRef.current = false;
+      currentTimeRef.current = targetItem.startTime;
+      setCurrentTime(targetItem.startTime);
+      const targetEl = lineElementsRef.current[lineIdx];
+      const container = lyricsContainerRef.current;
+      if (targetEl && container) {
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        const targetScrollContentY = targetRect.top - containerRect.top + container.scrollTop;
+        const targetScroll = Math.max(
+          0,
+          targetScrollContentY - container.clientHeight * 0.36
+        );
+        container.scrollTo({ top: targetScroll, behavior: 'smooth' });
+      }
+    }
+  };
+
+  const changeSpeed = (delta: number) => {
+    setSpeed((prev) => Math.max(0.5, Math.min(2.0, +(prev + delta).toFixed(2))));
+  };
+
   const changeFontSize = (delta: number) => {
-    setFontSize((prev) => Math.max(16, Math.min(52, prev + delta)));
+    setFontSize((prev) => Math.max(16, Math.min(50, prev + delta)));
   };
 
   const toggleFullscreen = () => {
@@ -295,7 +475,7 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
           });
 
           onRecordingSaved?.(savedRec);
-          setSavedRecordingToast(`Gravação salva com sucesso! Enviada para a aba Minhas Gravações.`);
+          setSavedRecordingToast(`Gravação salva com sucesso! Enviada para Minhas Gravações.`);
           confetti({ particleCount: 40, spread: 70, origin: { y: 0.6 } });
           setTimeout(() => setSavedRecordingToast(null), 4000);
         } catch (err) {
@@ -321,19 +501,21 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
     }
   };
 
+  // Progress bar seek
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    const el = lyricsContainerRef.current;
-    if (!el) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const pct = Math.max(0, Math.min(1, clickX / rect.width));
-    const maxScroll = el.scrollHeight - el.clientHeight;
-    el.scrollTop = maxScroll * pct;
-    handleScrollUpdate();
+    const nextTime = pct * totalDuration;
+    isUserInteractingRef.current = false;
+    currentTimeRef.current = nextTime;
+    setCurrentTime(nextTime);
   };
 
+  const progressPct = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
+
   return (
-    <section id="showMode" className="show-mode relative">
+    <section id="showMode" className="show-mode relative select-none">
       {/* TOAST FEEDBACK */}
       {savedRecordingToast && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 bg-[#041324]/95 border border-[#08a8ff] text-white px-5 py-2.5 rounded-2xl shadow-[0_0_30px_rgba(8,168,255,0.4)] flex items-center gap-2.5 text-sm font-medium animate-fade-in backdrop-blur-md">
@@ -360,11 +542,21 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
         </div>
 
         <div className="show-song flex-1 min-w-0 text-center px-2">
-          <strong className="block text-[10px] sm:text-xs text-zinc-400 truncate uppercase tracking-wider">{song.artist || 'Artista'}</strong>
-          <span id="showSongTitle" className="block text-xs sm:text-base font-black text-white truncate max-w-full">{song.title}</span>
+          <strong className="block text-[10px] sm:text-xs text-zinc-400 truncate uppercase tracking-wider">
+            {song.artist || 'Artista'}
+          </strong>
+          <span id="showSongTitle" className="block text-xs sm:text-base font-black text-white truncate max-w-full">
+            {song.title}
+          </span>
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* BADGE KARAOKE TEMPO ORIGINAL */}
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[11px] font-bold font-mono">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>KARAOKÊ COM PAUSAS</span>
+          </div>
+
           {onOpenSetlistPicker && (
             <button
               type="button"
@@ -375,12 +567,15 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
               <span>📋 Setlist</span>
             </button>
           )}
+
           <button
             className="fullscreen-button hidden sm:inline-flex text-xs px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
             onClick={toggleFullscreen}
+            title="Tela Cheia"
           >
             ⛶
           </button>
+
           <button
             type="button"
             onClick={onClose}
@@ -392,8 +587,9 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
         </div>
       </header>
 
-      {/* ÁREA DE LETRAS */}
+      {/* ÁREA DE LETRAS & PALCO */}
       <main className="lyrics-area w-full max-w-full overflow-hidden">
+        {/* CARD LATERAL ESQUERDO: CANTOR AO VIVO */}
         <div className="artist-image">
           <div className="artist-stage-card">
             <img
@@ -409,138 +605,219 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
               <span className="artist-card-live-tag">● AO VIVO</span>
               <p className="artist-card-artist">{song.artist || 'Artista no Palco'}</p>
               <h4 className="artist-card-title">{song.title}</h4>
+
+              {/* Status de Karaokê no Card */}
+              <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between text-[11px] font-mono">
+                <span className="text-zinc-400">Tempo:</span>
+                <span className="text-amber-300 font-bold">
+                  {formatKaraokeTime(currentTime)} / {formatKaraokeTime(totalDuration)}
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div
-          id="lyrics"
-          className="lyrics w-full max-w-2xl mx-auto px-2 sm:px-6 text-center select-none"
-          ref={lyricsContainerRef}
-          onScroll={handleScrollUpdate}
-          style={{ fontSize: `${fontSize}px` }}
-        >
-          {lines.map((line, idx) => {
-            const isHighlighted = idx === activeLineIndex;
-            return (
-              <p
-                key={idx}
-                className={`${isHighlighted ? 'highlight' : ''} break-words leading-relaxed`}
-                onClick={() => {
-                  setActiveLineIndex(idx);
-                  if (lyricsContainerRef.current) {
-                    const maxScroll =
-                      lyricsContainerRef.current.scrollHeight -
-                      lyricsContainerRef.current.clientHeight;
-                    lyricsContainerRef.current.scrollTop =
-                      (idx / lines.length) * maxScroll;
-                  }
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                {line}
-              </p>
-            );
-          })}
-          <div className="h-64" />
+        {/* CONTAINER CENTRAL: LETRAS KARAOKÊ */}
+        <div className="flex flex-col h-full min-h-0 min-w-0 max-w-2xl mx-auto w-full relative overflow-hidden">
+          {/* BANNER APENAS NA INTRODUÇÃO INICIAL DA MÚSICA (NUNCA A CADA FIM DE FRASE) */}
+          {karaokeState.isPause && karaokeState.pauseType === 'intro' && currentTime < 25 && (
+            <div className="w-full mb-3 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-zinc-900/95 to-amber-500/20 border-2 border-amber-400/60 shadow-[0_0_35px_rgba(251,191,36,0.25)] backdrop-blur-md animate-fade-in shrink-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">🎸</span>
+                  <div>
+                    <span className="font-mono text-[10px] sm:text-xs font-black tracking-widest uppercase text-amber-400 block">
+                      INTRODUÇÃO INSTRUMENTAL
+                    </span>
+                    <span className="text-xs text-zinc-300 font-medium">
+                      Aguarde a entrada do primeiro verso
+                    </span>
+                  </div>
+                </div>
+
+                {/* COUNTDOWN REGRESSIVO COM EQUALIZADOR */}
+                <div className="flex items-center gap-3 bg-zinc-950/80 px-3 py-1.5 rounded-xl border border-amber-400/30">
+                  <div className="flex items-end gap-0.5 h-4">
+                    <span className="w-1 bg-amber-400 rounded-full animate-pulse h-3" />
+                    <span className="w-1 bg-amber-300 rounded-full animate-bounce h-4" />
+                    <span className="w-1 bg-amber-400 rounded-full animate-pulse h-2" />
+                    <span className="w-1 bg-amber-300 rounded-full animate-bounce h-3.5" />
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-[9px] uppercase tracking-wider text-zinc-400 font-mono">
+                      Vocal entra em
+                    </span>
+                    <span className="font-mono text-base sm:text-lg font-black text-amber-300">
+                      {formatKaraokeTime(karaokeState.pauseCountdown)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* BARRA DE PROGRESSO DA INTRO */}
+              <div className="mt-2.5">
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-400 to-amber-300 transition-all duration-100 ease-linear"
+                    style={{ width: `${karaokeState.pauseProgress}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* LISTA DE LETRAS DO TELEPROMPTER */}
+          <div
+            id="lyrics"
+            className="lyrics relative flex-1 min-h-0 w-full px-2 sm:px-6 text-center select-none overflow-y-auto"
+            ref={lyricsContainerRef}
+            onWheel={handleUserInteraction}
+            onTouchMove={handleUserInteraction}
+            style={{ fontSize: `${fontSize}px` }}
+          >
+            {/* Espaçador superior para permitir que os primeiros versos subam continuamente desde o início */}
+            <div style={{ height: '36vh' }} className="shrink-0 pointer-events-none" />
+
+            {cleanLines.map((line, idx) => {
+              const isCurrentVocal = !karaokeState.isPause && idx === karaokeState.activeLineIndex;
+              const isPastVocal = !karaokeState.isPause ? idx < karaokeState.activeLineIndex : idx < karaokeState.activeLineIndex;
+
+              return (
+                <div
+                  key={idx}
+                  ref={(el) => {
+                    lineElementsRef.current[idx] = el;
+                    if (isCurrentVocal) {
+                      activeLineElementRef.current = el;
+                    }
+                  }}
+                  onClick={() => handleJumpToLine(idx)}
+                  className={`relative my-3 p-3 rounded-2xl transition-all duration-200 cursor-pointer ${
+                    isCurrentVocal
+                      ? 'bg-cyan-500/15 border-2 border-cyan-400 shadow-[0_0_25px_rgba(0,229,255,0.3)] scale-[1.02]'
+                      : isPastVocal
+                      ? 'opacity-35 hover:opacity-75'
+                      : 'opacity-70 hover:opacity-95'
+                  }`}
+                  title="Clique para avançar/voltar o karaokê para esta linha"
+                >
+                  <p
+                    className={`m-0 break-words leading-relaxed font-sans ${
+                      isCurrentVocal
+                        ? 'font-black text-white text-shadow-lg'
+                        : 'font-medium text-zinc-300'
+                    }`}
+                  >
+                    {line}
+                  </p>
+
+                  {/* BARRA DE VARREDURA DA FRASE ATUAL (KARAOKE LINE SWEEP) */}
+                  {isCurrentVocal && (
+                    <div className="w-full max-w-md mx-auto h-1.5 bg-zinc-800 rounded-full mt-2.5 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-cyan-400 via-amber-300 to-lime-400 transition-all duration-75 ease-linear rounded-full"
+                        style={{ width: `${karaokeState.lineProgress}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* Espaçador inferior para que todos os versos possam subir até a linha focal */}
+            <div style={{ height: '55vh' }} className="shrink-0 pointer-events-none" />
+          </div>
         </div>
 
-        {/* CONTROLES DE ROLAGEM (DESKTOP) */}
+        {/* CONTROLES LATERAIS (DESKTOP) */}
         <aside className="show-controls overflow-y-auto max-h-[calc(100vh-140px)] custom-scrollbar flex flex-col gap-2.5">
-          <span className="control-title">VELOCIDADE DA LETRA</span>
+          <span className="control-title">ANDAMENTO / TEMPO DO SHOW</span>
+
+          {/* RELÓGIO DE TEMPO REAL */}
+          <div className="p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 flex flex-col items-center justify-center text-center">
+            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
+              Tempo Decorrido
+            </span>
+            <div className="font-mono text-xl font-black text-white mt-0.5">
+              <span className="text-amber-400">{formatKaraokeTime(currentTime)}</span>
+              <span className="text-zinc-500 mx-1">/</span>
+              <span className="text-zinc-300">{formatKaraokeTime(totalDuration)}</span>
+            </div>
+            <span className="text-[9px] font-mono text-zinc-400 mt-1">
+              {progressPct.toFixed(0)}% concluído
+            </span>
+          </div>
 
           <div className="speed-control my-1">
-            <button onClick={() => changeSpeed(-0.25)}>−</button>
-            <strong id="speedValue">{speed.toFixed(1)}x</strong>
-            <button onClick={() => changeSpeed(0.25)}>+</button>
+            <button onClick={() => changeSpeed(-0.25)} aria-label="Diminuir velocidade">−</button>
+            <strong id="speedValue">{speed.toFixed(2)}x</strong>
+            <button onClick={() => changeSpeed(0.25)} aria-label="Aumentar velocidade">+</button>
           </div>
 
           <div className="speed-list">
-            {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((s) => (
+            {[0.75, 1.0, 1.25, 1.5].map((s) => (
               <button
                 key={s}
                 onClick={() => setSpeed(s)}
                 className={speed === s ? 'active' : ''}
+                title={s === 1.0 ? 'Tempo Original 1:1' : `${s}x`}
               >
-                {s.toFixed(2).replace('.00', '.0').replace('0.75', '0.75')}x
+                {s === 1.0 ? '1.0x (Original)' : `${s}x`}
               </button>
             ))}
           </div>
 
-          {/* MODO VELOCIDADE TEMPO REAL (BPM / TEMPO DA MÚSICA) */}
+          {/* AJUSTAR DURAÇÃO / BPM */}
           <div className="mt-1 p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 flex flex-col gap-1.5 shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono uppercase font-bold text-amber-400 flex items-center gap-1">
-                <Zap className="w-3 h-3" />
-                Tempo Real (BPM)
+                <Sliders className="w-3 h-3" />
+                Sincronia
               </span>
-              <button
-                type="button"
-                id="btn-toggle-realtime-tempo"
-                onClick={() => {
-                  setIsRealTempoMode(!isRealTempoMode);
-                  setSavedRecordingToast(
-                    !isRealTempoMode
-                      ? `Modo Tempo Real ativado! A letra acompanhará a duração de ${Math.floor(customDurationSeconds / 60)}:${String(customDurationSeconds % 60).padStart(2, '0')}.`
-                      : 'Modo velocidade manual ativado.'
-                  );
-                  setTimeout(() => setSavedRecordingToast(null), 3000);
-                }}
-                className={`px-2 py-0.5 rounded-full text-[9px] font-bold transition-all cursor-pointer ${
-                  isRealTempoMode
-                    ? 'bg-amber-400 text-zinc-950 shadow-md shadow-amber-400/30'
-                    : 'bg-zinc-800 text-zinc-400 hover:text-white'
-                }`}
-              >
-                {isRealTempoMode ? 'ATIVO' : 'OFF'}
-              </button>
+              <span className="text-[9px] text-zinc-400 font-mono">
+                {formatKaraokeTime(totalDuration)} ({songBpm} BPM)
+              </span>
             </div>
-
-            <p className="text-[9px] text-zinc-400 leading-tight">
-              {isRealTempoMode
-                ? `⚡ Sincronizado: ${Math.floor(customDurationSeconds / 60)}:${String(customDurationSeconds % 60).padStart(2, '0')} (${songBpm} BPM)`
-                : 'Acompanha o andamento exato da canção.'}
-            </p>
 
             <button
               type="button"
               id="btn-open-tempo-modal"
               onClick={() => setShowTempoModal(true)}
-              className="w-full py-1 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer"
+              className="w-full py-1.5 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer"
             >
-              <Sliders className="w-3 h-3 text-amber-400" />
-              <span>Ajustar BPM / Tempo</span>
+              <span>Ajustar Duração / BPM</span>
             </button>
           </div>
 
+          {/* BOTÃO GRAVAÇÃO AO VIVO */}
           <div className="pt-1 mt-auto shrink-0">
             <button
               id="recordButton"
               className={`record-show-button !mt-0 ${isRecording ? 'recording' : ''}`}
               onClick={toggleRecording}
             >
-              {isRecording ? `🔴 Gravando (${recordingTime}s)` : '🔴 Gravar'}
+              {isRecording ? `🔴 Gravando (${recordingTime}s)` : '🔴 Gravar Apresentação'}
             </button>
           </div>
         </aside>
       </main>
 
-      {/* BARRA INFERIOR (RODAPÉ) */}
+      {/* RODAPÉ DO REPRODUTOR / TELEPROMPTER */}
       <footer className="show-player">
-        <div className="progress" onClick={handleSeek}>
+        {/* BARRA DE PROGRESSO COM INTERAÇÃO DE CLIQUE / SEEK */}
+        <div className="progress cursor-pointer group" onClick={handleSeek} title="Clique para avançar ou voltar na música">
           <div
             id="progressBar"
-            className="progress-fill"
-            style={{ width: `${scrollProgress}%` }}
+            className="progress-fill bg-gradient-to-r from-amber-400 to-cyan-400 transition-all duration-75"
+            style={{ width: `${progressPct}%` }}
           />
         </div>
 
-        <div className="show-player-content w-full max-w-5xl mx-auto">
+        <div className="show-player-content w-full max-w-5xl mx-auto px-2">
           {/* ========================================================= */}
-          {/* 1. MODO DESKTOP / TABLET (>= 768px / md): 3 COLUNAS LIMPAS */}
+          {/* 1. MODO DESKTOP / TABLET (>= 768px / md): 3 COLUNAS */}
           {/* ========================================================= */}
           <div className="hidden md:flex items-center justify-between w-full gap-4">
-            {/* GRUPO ESQUERDA: GRAVAR & FONTE */}
+            {/* GRUPO ESQUERDA: GRAVAÇÃO, TEMPO & TAMANHO FONTE */}
             <div className="flex items-center gap-2.5 shrink-0 flex-1 justify-start">
               <button
                 id="mobileRecordButton"
@@ -554,12 +831,34 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
                 </span>
               </button>
 
-              <div className="mobile-speed-control flex items-center shrink-0" title="Velocidade da letra">
-                <button onClick={() => changeSpeed(-0.25)} aria-label="Diminuir velocidade">−</button>
-                <span className="speed-val">{speed.toFixed(1)}x</span>
-                <button onClick={() => changeSpeed(0.25)} aria-label="Aumentar velocidade">+</button>
+              {/* RELÓGIO MM:SS NO RODAPÉ */}
+              <div className="px-2.5 py-1 rounded-xl bg-zinc-900 border border-zinc-800 font-mono text-xs flex items-center gap-1">
+                <span className="text-amber-400 font-bold">{formatKaraokeTime(currentTime)}</span>
+                <span className="text-zinc-600">/</span>
+                <span className="text-zinc-400">{formatKaraokeTime(totalDuration)}</span>
               </div>
 
+              {/* Botões de Pular -10s / +10s */}
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleSkipTime(-10)}
+                  className="px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-[11px] font-mono border border-zinc-800 cursor-pointer"
+                  title="Voltar 10 segundos"
+                >
+                  -10s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSkipTime(10)}
+                  className="px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-[11px] font-mono border border-zinc-800 cursor-pointer"
+                  title="Avançar 10 segundos"
+                >
+                  +10s
+                </button>
+              </div>
+
+              {/* Tamanho da Fonte */}
               <div className="flex items-center gap-1 shrink-0 ml-1">
                 <button
                   type="button"
@@ -580,15 +879,16 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
               </div>
             </div>
 
-            {/* GRUPO CENTRAL: TRANSPORTE DE MÚSICA & ROLAGEM (SEM SOBREPOSIÇÃO) */}
+            {/* GRUPO CENTRAL: TRANSPORTE PRINCIPAL KARAOKÊ */}
             <div className="player-controls flex items-center justify-center gap-3 shrink-0 flex-nowrap">
+              {/* REWIND TO START */}
               <button
                 type="button"
-                onClick={lyricsStart}
-                title="Voltar ao início da letra"
+                onClick={handleRewindToStart}
+                title="Reiniciar karaokê do início (00:00)"
                 className="w-9 h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center justify-center text-xs transition-colors cursor-pointer shrink-0"
               >
-                |◀
+                <RotateCcw className="w-4 h-4" />
               </button>
 
               {hasPlaylist && (
@@ -605,13 +905,13 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
                 </button>
               )}
 
-              {/* BOTÃO PLAY / PAUSE TELEPROMPTER */}
+              {/* BOTÃO PLAY / PAUSE PRINCIPAL */}
               <button
                 type="button"
                 id="playButton"
-                className="play-main hover:scale-105 active:scale-95 transition-transform shrink-0 cursor-pointer"
-                onClick={toggleLyrics}
-                title={isPlaying ? 'Pausar rolagem automática' : 'Iniciar rolagem automática'}
+                className="play-main hover:scale-105 active:scale-95 transition-transform shrink-0 cursor-pointer shadow-[0_0_25px_rgba(251,191,36,0.4)]"
+                onClick={togglePlayback}
+                title={isPlaying ? 'Pausar karaokê' : 'Iniciar karaokê'}
               >
                 {isPlaying ? '❚❚' : '▶'}
               </button>
@@ -632,16 +932,22 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
 
               <button
                 type="button"
-                onClick={lyricsEnd}
-                title="Ir ao final da letra"
+                onClick={() => setCurrentTime(totalDuration)}
+                title="Avançar ao final da música"
                 className="w-9 h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center justify-center text-xs transition-colors cursor-pointer shrink-0"
               >
                 ▶|
               </button>
             </div>
 
-            {/* GRUPO DIREITA: SAIR E TELA CHEIA */}
+            {/* GRUPO DIREITA: VELOCIDADE & SAIR */}
             <div className="player-options flex items-center justify-end gap-2 shrink-0 flex-1">
+              <div className="mobile-speed-control flex items-center shrink-0" title="Velocidade de reprodução">
+                <button onClick={() => changeSpeed(-0.25)} aria-label="Diminuir velocidade">−</button>
+                <span className="speed-val font-mono">{speed.toFixed(2)}x</span>
+                <button onClick={() => changeSpeed(0.25)} aria-label="Aumentar velocidade">+</button>
+              </div>
+
               <button
                 type="button"
                 onClick={toggleFullscreen}
@@ -650,6 +956,7 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
               >
                 ⛶
               </button>
+
               <button
                 type="button"
                 onClick={onClose}
@@ -662,18 +969,18 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
           </div>
 
           {/* ========================================================= */}
-          {/* 2. MODO CELULAR (< md): A COLUNA COMPLETA NO RODAPÉ       */}
+          {/* 2. MODO CELULAR (< md): COMPACTO & ERGONÔMICO              */}
           {/* ========================================================= */}
-          <div className="flex md:hidden flex-col w-full gap-2.5">
-            {/* LINHA 1: TRANSPORTE PRINCIPAL (SEM NENHUMA SOBREPOSIÇÃO) */}
-            <div className="flex items-center justify-center gap-2.5 w-full shrink-0 flex-nowrap">
+          <div className="flex md:hidden flex-col w-full gap-2">
+            {/* LINHA 1: CONTROLES PRINCIPAIS */}
+            <div className="flex items-center justify-between gap-1.5 w-full">
               <button
                 type="button"
-                onClick={lyricsStart}
-                title="Voltar ao início"
-                className="w-8 h-8 rounded-lg bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 flex items-center justify-center text-xs shrink-0"
+                onClick={handleRewindToStart}
+                className="w-8 h-8 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 flex items-center justify-center text-xs shrink-0"
+                title="Reiniciar"
               >
-                |◀
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
 
               {hasPlaylist && (
@@ -682,10 +989,9 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
                   id="mobile-btn-prev-song"
                   onClick={handlePrevSong}
                   disabled={!prevSong}
-                  className="px-2.5 py-1.5 rounded-xl bg-zinc-850 text-zinc-200 border border-zinc-700/80 flex items-center gap-1 text-xs font-bold disabled:opacity-30 shrink-0"
-                  title="Música anterior"
+                  className="px-2 py-1.5 rounded-xl bg-zinc-850 text-zinc-200 border border-zinc-700/80 flex items-center gap-1 text-xs font-bold disabled:opacity-30 shrink-0"
                 >
-                  <SkipBack className="w-3.5 h-3.5 fill-current" />
+                  <SkipBack className="w-3 h-3 fill-current" />
                   <span>Ant</span>
                 </button>
               )}
@@ -695,8 +1001,8 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
                 type="button"
                 id="mobilePlayButton"
                 className="play-main hover:scale-105 active:scale-95 transition-transform shrink-0"
-                onClick={toggleLyrics}
-                title={isPlaying ? 'Pausar rolagem' : 'Iniciar rolagem'}
+                onClick={togglePlayback}
+                title={isPlaying ? 'Pausar' : 'Iniciar'}
               >
                 {isPlaying ? '❚❚' : '▶'}
               </button>
@@ -707,125 +1013,66 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
                   id="mobile-btn-next-song"
                   onClick={handleNextSong}
                   disabled={!nextSong}
-                  className="px-3 py-1.5 rounded-xl bg-amber-400 text-zinc-950 font-black text-xs flex items-center gap-1 shadow-md shrink-0"
-                  title="Próxima música"
+                  className="px-2.5 py-1.5 rounded-xl bg-amber-400 text-zinc-950 font-black text-xs flex items-center gap-1 shadow-md shrink-0"
                 >
                   <span>Próx</span>
-                  <SkipForward className="w-3.5 h-3.5 fill-current" />
+                  <SkipForward className="w-3 h-3 fill-current" />
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={lyricsEnd}
-                title="Ir ao final"
-                className="w-8 h-8 rounded-lg bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 flex items-center justify-center text-xs shrink-0"
-              >
-                ▶|
-              </button>
-            </div>
-
-            {/* LINHA 2: COLUNA DE VELOCIDADE (STEPPER + PRESETS) */}
-            <div className="flex items-center justify-between gap-2 w-full flex-wrap bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-2">
-              {/* Stepper de velocidade */}
-              <div className="mobile-speed-control flex items-center shrink-0">
-                <button onClick={() => changeSpeed(-0.25)} aria-label="Diminuir velocidade">−</button>
-                <span className="speed-val font-mono">{speed.toFixed(1)}x</span>
-                <button onClick={() => changeSpeed(0.25)} aria-label="Aumentar velocidade">+</button>
-              </div>
-
-              {/* Chips rápidos de velocidade da coluna */}
-              <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar shrink-0 py-0.5">
-                {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setSpeed(s)}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
-                      speed === s
-                        ? 'bg-amber-400 text-zinc-950 shadow-sm font-black'
-                        : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800'
-                    }`}
-                  >
-                    {s}x
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* LINHA 3: TEMPO REAL (BPM), GRAVAÇÃO & CONTROLES EXTRAS */}
-            <div className="flex items-center justify-between gap-2 w-full flex-wrap">
-              {/* Tempo Real (BPM) da coluna */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRealTempoMode(!isRealTempoMode);
-                    setSavedRecordingToast(
-                      !isRealTempoMode
-                        ? `Modo Tempo Real ativado (${songBpm} BPM)`
-                        : 'Modo manual ativado'
-                    );
-                    setTimeout(() => setSavedRecordingToast(null), 3000);
-                  }}
-                  className={`px-2.5 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                    isRealTempoMode
-                      ? 'bg-amber-400 text-zinc-950 shadow-md font-black'
-                      : 'bg-zinc-900 border border-zinc-800 text-zinc-400'
-                  }`}
-                  title="Alternar Modo Tempo Real"
-                >
-                  <Zap className="w-3 h-3" />
-                  <span>{isRealTempoMode ? 'BPM ON' : 'BPM OFF'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowTempoModal(true)}
-                  className="px-2 py-1 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-[10px] font-bold flex items-center gap-1 cursor-pointer"
-                  title="Ajustar BPM / Tempo"
-                >
-                  <Sliders className="w-3 h-3 text-amber-400" />
-                  <span>Ajustar</span>
-                </button>
-              </div>
-
-              {/* Gravação da coluna */}
+              {/* GRAVAÇÃO MOBILE */}
               <button
                 id="mobileFooterRecordButton"
                 className={`record-show-button-mobile shrink-0 ${isRecording ? 'recording' : ''}`}
                 onClick={toggleRecording}
-                title="Gravar apresentação"
+                title="Gravar"
               >
                 <span className="rec-dot">●</span>
                 <span className="rec-label text-xs">
                   {isRecording ? `${recordingTime}s` : 'Gravar'}
                 </span>
               </button>
+            </div>
 
-              {/* Fonte & Sair */}
-              <div className="flex items-center gap-1 shrink-0 ml-auto">
+            {/* LINHA 2: TEMPO & CONTROLES */}
+            <div className="flex items-center justify-between gap-1 w-full bg-zinc-950/80 border border-zinc-800/80 rounded-xl px-2 py-1 text-xs">
+              <div className="font-mono text-amber-400 font-bold">
+                {formatKaraokeTime(currentTime)} / {formatKaraokeTime(totalDuration)}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleSkipTime(-5)}
+                  className="px-1.5 py-0.5 rounded bg-zinc-900 text-[10px] text-zinc-300"
+                >
+                  -5s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSkipTime(5)}
+                  className="px-1.5 py-0.5 rounded bg-zinc-900 text-[10px] text-zinc-300"
+                >
+                  +5s
+                </button>
                 <button
                   type="button"
                   onClick={() => changeFontSize(-2)}
-                  className="w-7 h-7 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 text-xs font-bold"
-                  title="Diminuir fonte"
+                  className="px-1.5 py-0.5 rounded bg-zinc-900 text-[10px] text-zinc-300 font-bold"
                 >
-                  A−
+                  A-
                 </button>
                 <button
                   type="button"
                   onClick={() => changeFontSize(2)}
-                  className="w-7 h-7 rounded-lg bg-zinc-900 text-zinc-300 border border-zinc-800 text-xs font-bold"
-                  title="Aumentar fonte"
+                  className="px-1.5 py-0.5 rounded bg-zinc-900 text-[10px] text-zinc-300 font-bold"
                 >
                   A+
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[11px] font-bold"
-                  title="Sair"
+                  className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]"
                 >
                   ✕ Sair
                 </button>
@@ -842,7 +1089,7 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold">Modo Tempo Real da Música</h3>
+                <h3 className="text-base font-bold">Tempo Original da Gravação</h3>
               </div>
               <button
                 onClick={() => setShowTempoModal(false)}
@@ -855,21 +1102,21 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
             <div className="py-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-zinc-400 mb-1.5">
-                  Duração Real da Música (Minutos : Segundos)
+                  Duração da Gravação Original (Minutos : Segundos)
                 </label>
                 <div className="grid grid-cols-4 gap-1.5">
                   {[150, 180, 210, 240, 270, 300, 330, 360].map((sec) => (
                     <button
                       key={sec}
                       type="button"
-                      onClick={() => setCustomDurationSeconds(sec)}
+                      onClick={() => setCustomDuration(sec)}
                       className={`py-2 px-1 rounded-xl text-xs font-mono font-bold transition-all ${
-                        customDurationSeconds === sec
+                        customDuration === sec
                           ? 'bg-amber-400 text-zinc-950 shadow-md'
                           : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
                       }`}
                     >
-                      {Math.floor(sec / 60)}:{String(sec % 60).padStart(2, '0')}
+                      {formatKaraokeTime(sec)}
                     </button>
                   ))}
                 </div>
@@ -877,7 +1124,7 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-400 mb-1.5">
-                  Andamento da Música (BPM: {songBpm})
+                  Andamento Musical (BPM: {songBpm})
                 </label>
                 <input
                   type="range"
@@ -889,22 +1136,20 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
                   className="w-full accent-amber-400 cursor-pointer"
                 />
                 <div className="flex justify-between text-[10px] text-zinc-500 font-mono mt-1">
-                  <span>60 Lento (Balada)</span>
-                  <span>120 Padrão</span>
-                  <span>200 Rápido (Rock)</span>
+                  <span>60 Lento</span>
+                  <span>115 Médio</span>
+                  <span>180 Rápido</span>
                 </div>
               </div>
 
               <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 text-xs text-zinc-300 space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Tempo total:</span>
-                  <strong className="text-white font-mono">
-                    {Math.floor(customDurationSeconds / 60)}m {customDurationSeconds % 60}s
-                  </strong>
+                  <span className="text-zinc-400">Tempo total do áudio:</span>
+                  <strong className="text-white font-mono">{formatKaraokeTime(customDuration)}</strong>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Velocidade calculada:</span>
-                  <strong className="text-amber-400 font-mono">Sincronia Exata</strong>
+                  <span className="text-zinc-400">Pausas Instrumentais:</span>
+                  <strong className="text-emerald-400 font-mono">Sincronizadas</strong>
                 </div>
               </div>
             </div>
@@ -913,16 +1158,13 @@ export const ShowModeView: React.FC<ShowModeViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setIsRealTempoMode(true);
                   setShowTempoModal(false);
-                  setSavedRecordingToast(
-                    `Tempo Real Ativado: ${Math.floor(customDurationSeconds / 60)}:${String(customDurationSeconds % 60).padStart(2, '0')}`
-                  );
-                  setTimeout(() => setSavedRecordingToast(null), 3000);
+                  setSavedRecordingToast(`Duração ajustada para ${formatKaraokeTime(customDuration)}`);
+                  setTimeout(() => setSavedRecordingToast(null), 2500);
                 }}
                 className="flex-1 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-400/20 transition-all cursor-pointer"
               >
-                Ativar & Sincronizar
+                Confirmar
               </button>
               <button
                 type="button"
