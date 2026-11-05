@@ -1681,14 +1681,14 @@ export default function App() {
             <section className="page search-page">
               <div className="page-title">
                 <div>
-                  <span className="small-label">CATÁLOGO GLOBAL</span>
-                  <h1>Pesquisar músicas</h1>
+                  <span className="small-label">ACERVO OFICIAL & REPERTÓRIO</span>
+                  <h1>Catálogo Global & Repertório</h1>
                 </div>
                 <button
                   className="primary-button"
                   onClick={() => setShowAddSongModal(true)}
                 >
-                  + Adicionar Manualmente
+                  + Cadastrar Letra Manual
                 </button>
               </div>
 

@@ -285,33 +285,33 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
           {/* ==================================================== */}
           {/* HEADER (SPACIOUS, MODERN, SLEEK) */}
           {/* ==================================================== */}
-          <div className="px-6 py-5 border-b border-zinc-800/80 bg-[#040813] flex items-start justify-between gap-4 shrink-0">
+          <div className="px-6 py-5 border-b border-zinc-800/80 bg-gradient-to-r from-[#030712] via-[#050f22] to-[#030712] flex items-start justify-between gap-4 shrink-0">
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-black uppercase tracking-wider">
-                  <Globe className="w-3.5 h-3.5" />
+              <div className="flex flex-wrap items-center gap-2.5 mb-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 text-xs font-black uppercase tracking-wider shadow-sm">
+                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Catálogo Global & Repertório</span>
                 </span>
                 <span className="text-zinc-600 hidden sm:inline">•</span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-medium">
-                  <Music className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Setlist:</span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-zinc-900/90 border border-zinc-700/80 text-zinc-300 text-xs font-medium">
+                  <Music className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Destino:</span>
                   <strong className="text-white font-bold">{activeSetlist.name}</strong>
-                  <span className="text-zinc-500">({activeSetlist.songs?.length || 0} músicas)</span>
+                  <span className="text-amber-400 font-mono">({activeSetlist.songs?.length || 0} faixas)</span>
                 </span>
               </div>
 
               <h2 className="text-xl sm:text-2xl font-black text-white font-display tracking-tight flex items-center gap-2">
-                <span>Pesquisar Músicas e Adicionar ao Setlist</span>
+                <span>Pesquisar Músicas e Adicionar ao Repertório</span>
               </h2>
-              <p className="text-xs sm:text-sm text-zinc-400 mt-1 max-w-3xl leading-relaxed">
-                Busque no acervo com letras completas, cifras e sincronização para teleprompter. Adicione músicas ao setlist com apenas um clique.
+              <p className="text-xs sm:text-sm text-zinc-300 mt-1 max-w-3xl leading-relaxed">
+                Explore o catálogo completo com letras originais sincronizadas para teleprompter e cifras para palco. Adicione faixas com um clique.
               </p>
             </div>
 
             <button
               onClick={onClose}
-              className="p-2.5 rounded-2xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer shrink-0 shadow-sm"
+              className="p-2.5 rounded-2xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-400 hover:text-white transition-all cursor-pointer shrink-0 shadow-sm"
               title="Fechar"
             >
               <X size={20} />
@@ -319,53 +319,53 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
           </div>
 
           {/* ==================================================== */}
-          {/* TABS NAVIGATION (MODERN PILLS) */}
+          {/* TABS NAVIGATION (MODERN SEGMENTED CONTROLS) */}
           {/* ==================================================== */}
-          <div className="px-6 py-3 border-b border-zinc-800/70 bg-[#060c18] flex items-center justify-between gap-4 overflow-x-auto shrink-0">
-            <div className="flex items-center gap-2">
+          <div className="px-6 py-3.5 border-b border-zinc-800/80 bg-[#040a17] flex items-center justify-between gap-4 overflow-x-auto shrink-0">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setActiveTab('global')}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                   activeTab === 'global'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border border-blue-400/40'
-                    : 'bg-zinc-900/90 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800'
+                    ? 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white shadow-[0_0_25px_rgba(6,182,212,0.35)] border border-cyan-400/60'
+                    : 'bg-zinc-900/90 text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-700/80'
                 }`}
               >
-                <Globe className="w-4 h-4 text-blue-400" />
+                <Globe className="w-4 h-4 text-cyan-400" />
                 <span>Catálogo Global (Pesquisar Músicas)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab('library')}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                   activeTab === 'library'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border border-blue-400/40'
-                    : 'bg-zinc-900/90 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800'
+                    ? 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white shadow-[0_0_25px_rgba(6,182,212,0.35)] border border-cyan-400/60'
+                    : 'bg-zinc-900/90 text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-700/80'
                 }`}
               >
-                <Library className="w-4 h-4 text-blue-400" />
+                <Library className="w-4 h-4 text-cyan-400" />
                 <span>Minha Biblioteca ({allLibrarySongs.length})</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveTab('new')}
-                className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                   activeTab === 'new'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border border-blue-400/40'
-                    : 'bg-zinc-900/90 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800'
+                    ? 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white shadow-[0_0_25px_rgba(6,182,212,0.35)] border border-cyan-400/60'
+                    : 'bg-zinc-900/90 text-zinc-300 hover:text-white hover:bg-zinc-800 border border-zinc-700/80'
                 }`}
               >
-                <PenTool className="w-4 h-4 text-blue-400" />
+                <PenTool className="w-4 h-4 text-cyan-400" />
                 <span>Cadastrar Manualmente</span>
               </button>
             </div>
 
-            <div className="hidden lg:flex items-center gap-2 text-xs text-zinc-400">
+            <div className="hidden lg:flex items-center gap-2 text-xs text-emerald-400 font-semibold bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-xl">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Letras completas prontas para o Modo Show</span>
+              <span>Letras sincronizadas para o Modo Show</span>
             </div>
           </div>
 
@@ -373,121 +373,122 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
           {/* TAB 1: CATÁLOGO GLOBAL (PESQUISAR MÚSICAS) */}
           {/* ==================================================== */}
           {activeTab === 'global' && (
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              {/* SEARCH BAR SECTION */}
-              <div className="bg-zinc-950/70 border border-zinc-800/90 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
-                <form onSubmit={handleSearchSubmit} className="space-y-4">
-                  <div className="relative flex items-center">
-                    <div className="absolute left-4 text-blue-400 pointer-events-none">
-                      <Search size={20} />
-                    </div>
-                    <input
-                      type="text"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Pesquisar música ou banda (ex: CPM 22, Legião Urbana, Charlie Brown Jr, Coldplay, Titãs...)"
-                      className="w-full pl-12 pr-36 py-3.5 bg-[#030814] border border-blue-500/30 focus:border-blue-500 rounded-2xl text-sm sm:text-base text-white placeholder-zinc-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all shadow-inner"
-                      autoFocus
-                    />
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 custom-scrollbar bg-[#020610]">
+              {/* HERO SEARCH BAR SECTION - SUPER DESTACADA */}
+              <div className="p-1 sm:p-1.5 rounded-3xl bg-gradient-to-r from-cyan-500/50 via-blue-600/40 to-indigo-500/50 shadow-[0_0_35px_rgba(6,182,212,0.22)]">
+                <div className="bg-[#040916] rounded-[22px] p-4 sm:p-5 space-y-4">
+                  <form onSubmit={handleSearchSubmit} className="space-y-4">
+                    {/* INPUT ROW COM BOTÃO BUSCAR DESTACADO */}
+                    <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-[#02050e] border-2 border-cyan-500/40 focus-within:border-cyan-400 focus-within:shadow-[0_0_30px_rgba(6,182,212,0.35)] rounded-2xl p-2 transition-all">
+                      <div className="flex items-center flex-1 min-w-0 px-2">
+                        <Search className="w-6 h-6 text-cyan-400 shrink-0 ml-1" />
+                        <input
+                          type="text"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder="Digite o nome da música ou do artista (ex: Legião Urbana, Charlie Brown Jr, CPM 22...)"
+                          className="w-full pl-3 pr-2 py-2.5 bg-transparent text-base sm:text-lg text-white placeholder-zinc-400 font-semibold outline-none"
+                          autoFocus
+                        />
+                        {query && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQuery('');
+                              setSearchResults([]);
+                              setHasSearched(false);
+                            }}
+                            className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer mr-1"
+                            title="Limpar pesquisa"
+                          >
+                            <X size={18} />
+                          </button>
+                        )}
+                      </div>
 
-                    <div className="absolute right-2.5 flex items-center gap-2">
-                      {query && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setQuery('');
-                            setSearchResults([]);
-                            setHasSearched(false);
-                          }}
-                          className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
-                          title="Limpar"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
                       <button
                         type="submit"
                         disabled={searchLoading || !query.trim()}
-                        className="px-5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-blue-500/20 active:scale-95"
+                        className="px-7 py-3 rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 hover:brightness-110 active:scale-95 disabled:opacity-40 text-white font-black text-sm uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2 cursor-pointer transition-all shrink-0"
                       >
-                        {searchLoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                        <span>Buscar</span>
+                        {searchLoading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+                        <span>Buscar no Catálogo</span>
                       </button>
                     </div>
-                  </div>
 
-                  {/* Filter Pills & Suggestions Row */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                    {/* Category Tabs */}
-                    <div className="flex items-center gap-1.5 bg-[#030814] p-1 rounded-xl border border-zinc-800">
-                      {(['Todas', 'Músicas', 'Artistas'] as const).map((tab) => (
-                        <button
-                          key={tab}
-                          type="button"
-                          onClick={() => {
-                            setSearchFilter(tab);
-                            if (query.trim()) executeCatalogSearch(query, tab);
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            searchFilter === tab
-                              ? 'bg-blue-600 text-white shadow-sm'
-                              : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
-                          }`}
-                        >
-                          {tab}
-                        </button>
-                      ))}
-                    </div>
+                    {/* Filter Segmented Control & Quick Suggestions */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                      {/* Category Tabs */}
+                      <div className="flex items-center gap-1 bg-[#02050e] p-1 rounded-xl border border-zinc-800">
+                        {(['Todas', 'Músicas', 'Artistas'] as const).map((tab) => (
+                          <button
+                            key={tab}
+                            type="button"
+                            onClick={() => {
+                              setSearchFilter(tab);
+                              if (query.trim()) executeCatalogSearch(query, tab);
+                            }}
+                            className={`px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                              searchFilter === tab
+                                ? 'bg-cyan-500 text-zinc-950 shadow-md font-black'
+                                : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
+                            }`}
+                          >
+                            {tab}
+                          </button>
+                        ))}
+                      </div>
 
-                    {/* Quick Suggestions */}
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs text-zinc-500 font-bold flex items-center gap-1 mr-1">
-                        <Flame className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Sugestões:</span>
-                      </span>
-                      {quickChips.slice(0, 6).map((chip) => (
-                        <button
-                          key={chip}
-                          type="button"
-                          onClick={() => {
-                            setQuery(chip);
-                            executeCatalogSearch(chip, searchFilter);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-blue-950/60 border border-zinc-800 hover:border-blue-500/40 text-xs text-zinc-300 hover:text-blue-300 transition-all cursor-pointer"
-                        >
-                          {chip}
-                        </button>
-                      ))}
+                      {/* Quick Suggestions */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs text-amber-400 font-bold flex items-center gap-1 mr-1">
+                          <Flame className="w-3.5 h-3.5" />
+                          <span>Mais tocadas:</span>
+                        </span>
+                        {quickChips.slice(0, 6).map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => {
+                              setQuery(chip);
+                              executeCatalogSearch(chip, searchFilter);
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-zinc-900 hover:bg-cyan-950 border border-zinc-700/80 hover:border-cyan-400 text-xs font-medium text-zinc-200 hover:text-cyan-300 transition-all cursor-pointer"
+                          >
+                            {chip}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </form>
+                  </form>
+                </div>
               </div>
 
               {/* SEARCH RESULTS OR EMPTY STATE */}
               {searchLoading ? (
                 <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
-                  <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <div className="w-16 h-16 rounded-3xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-lg shadow-cyan-500/10">
                     <Loader2 size={32} className="animate-spin" />
                   </div>
-                  <strong className="text-base text-white">Consultando Catálogo Global</strong>
-                  <p className="text-xs text-zinc-400 font-medium max-w-sm">
-                    Recuperando letras sincronizadas e cifras originais prontas para o palco...
+                  <strong className="text-base sm:text-lg text-white font-bold">Consultando Catálogo Global</strong>
+                  <p className="text-xs sm:text-sm text-zinc-300 font-medium max-w-sm">
+                    Recuperando letras originais sincronizadas e cifras de palco...
                   </p>
                 </div>
               ) : searchResults.length > 0 ? (
                 <div className="space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
-                    <span className="text-xs sm:text-sm font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-blue-400" />
-                      <span>Resultados no Catálogo ({searchResults.length} músicas encontradas)</span>
+                    <span className="text-xs sm:text-sm font-black text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-cyan-400" />
+                      <span>{searchResults.length} Músicas Encontradas no Catálogo</span>
                     </span>
-                    <span className="text-xs text-blue-400 font-medium">
+                    <span className="text-xs text-zinc-400 font-medium">
                       Clique em "+ Adicionar ao Setlist" para incluir diretamente no repertório
                     </span>
                   </div>
 
                   {/* 2-COLUMN RESPONSIVE GRID FOR MODERN SPACIOUS DISPLAY */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
                     {searchResults.map((item) => {
                       const isAlreadyInSetlist = activeSetlist.songs?.some(
                         (s) =>
@@ -500,7 +501,7 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                       return (
                         <div
                           key={item.id}
-                          className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800/90 hover:border-blue-500/50 hover:bg-[#070f22] transition-all flex items-center justify-between gap-3 group shadow-sm"
+                          className="p-4 sm:p-5 rounded-2xl bg-[#040c19] border-2 border-zinc-800/90 hover:border-cyan-400/60 hover:bg-[#061226] hover:shadow-[0_0_25px_rgba(6,182,212,0.18)] transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 group shadow-sm"
                         >
                           {/* Album Art / Cover + Title & Artist */}
                           <div className="flex items-center gap-3.5 min-w-0 flex-1">
@@ -512,7 +513,7 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                                   'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80'
                                 }
                                 alt={item.title}
-                                className="w-13 h-13 rounded-xl object-cover border border-zinc-800 bg-zinc-900 group-hover:scale-105 transition-transform"
+                                className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover border-2 border-zinc-700/80 bg-zinc-900 group-hover:scale-105 group-hover:border-cyan-400 transition-all shadow-md"
                                 onError={(e) => {
                                   (e.currentTarget as HTMLElement).style.display = 'none';
                                 }}
@@ -520,43 +521,42 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                             </div>
 
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5 mb-0.5">
-                                <strong className="text-white text-sm sm:text-base font-bold truncate block group-hover:text-blue-300 transition-colors">
-                                  {item.title}
-                                </strong>
-                              </div>
-                              <span className="text-xs sm:text-sm text-zinc-400 font-medium truncate block">
+                              <h4 className="text-white text-base sm:text-lg font-black truncate block group-hover:text-cyan-300 transition-colors leading-tight">
+                                {item.title}
+                              </h4>
+                              <p className="text-cyan-400 text-xs sm:text-sm font-bold truncate block mt-0.5">
                                 {item.artist}
-                              </span>
+                              </p>
 
-                              <div className="flex items-center gap-2 mt-1.5">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                                  <CheckCircle2 className="w-2.5 h-2.5 text-blue-400" />
-                                  <span>Letra Verificada</span>
+                              {/* Clean unboxed metadata with dot separators */}
+                              <div className="flex items-center gap-2 text-xs text-zinc-400 mt-2 font-medium">
+                                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Original LRC</span>
                                 </span>
-                                {item.album && (
-                                  <span className="text-[10px] text-zinc-500 truncate max-w-[120px] hidden sm:inline">
-                                    {item.album}
-                                  </span>
-                                )}
+                                <span aria-hidden="true" className="text-zinc-600">·</span>
+                                <span className="truncate max-w-[140px] text-zinc-400">
+                                  {item.album || 'Catálogo Oficial'}
+                                </span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Action Buttons */}
-                          <div className="flex items-center gap-2 shrink-0">
+                          {/* Action Buttons - Bem Destacados */}
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                             <button
                               type="button"
                               onClick={() => handleOpenLyricsPreview(item)}
-                              className="p-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer"
-                              title="Visualizar letra completa"
+                              className="px-3 py-2.5 rounded-xl bg-[#07162b] hover:bg-cyan-950 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+                              title="Visualizar letra completa e cifra"
                             >
-                              <Eye size={16} />
+                              <Eye size={15} />
+                              <span>Letra & Cifra</span>
                             </button>
 
                             {isAlreadyInSetlist ? (
-                              <div className="px-3.5 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
-                                <Check size={14} className="text-emerald-400" />
+                              <div className="px-4 py-2.5 rounded-xl bg-emerald-950/80 border-2 border-emerald-500/60 text-emerald-300 text-xs font-black flex items-center gap-1.5 shadow-sm">
+                                <Check size={16} className="text-emerald-400" />
                                 <span>No Setlist</span>
                               </div>
                             ) : (
@@ -564,16 +564,16 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                                 type="button"
                                 onClick={() => handleAddCatalogItemToSetlist(item)}
                                 disabled={isAddingThis}
-                                className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-blue-500/20 active:scale-95"
+                                className="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 active:scale-95 disabled:opacity-50 text-white text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-emerald-500/25 uppercase tracking-wide"
                               >
                                 {isAddingThis ? (
                                   <>
-                                    <Loader2 size={14} className="animate-spin" />
+                                    <Loader2 size={15} className="animate-spin" />
                                     <span>Adicionando...</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Plus size={14} />
+                                    <Plus size={16} className="stroke-[3]" />
                                     <span>+ Adicionar</span>
                                   </>
                                 )}
@@ -655,13 +655,13 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                 <>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                     <div className="relative flex-1">
-                      <Search size={18} className="absolute left-4 top-3.5 text-zinc-500 pointer-events-none" />
+                      <Search size={20} className="absolute left-4 top-3.5 text-cyan-400 pointer-events-none" />
                       <input
                         type="text"
                         placeholder="Filtrar músicas da sua biblioteca pessoal..."
                         value={libraryFilter}
                         onChange={(e) => setLibraryFilter(e.target.value)}
-                        className="w-full pl-11 pr-4 py-3 bg-zinc-950 border border-zinc-800 rounded-2xl text-xs sm:text-sm text-white focus:border-blue-500 outline-none"
+                        className="w-full pl-12 pr-4 py-3 bg-[#030814] border-2 border-cyan-500/40 focus:border-cyan-400 focus:shadow-[0_0_25px_rgba(6,182,212,0.25)] rounded-2xl text-sm sm:text-base text-white placeholder-zinc-400 font-semibold outline-none transition-all"
                       />
                     </div>
                     {onDeleteSongFromLibrary && allLibrarySongs.length > 0 && (
@@ -673,16 +673,16 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                             onShowToast('Todas as músicas foram removidas da biblioteca.');
                           }
                         }}
-                        className="px-3.5 py-3 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                        className="px-4 py-3 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
                         title="Excluir todas as músicas da sua biblioteca"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <Trash2 className="w-4 h-4 text-rose-400" />
                         <span>Excluir Todas ({allLibrarySongs.length})</span>
                       </button>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
                     {allLibrarySongs
                       .filter((s) => {
                         if (!libraryFilter.trim()) return true;
@@ -694,14 +694,14 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                         return (
                           <div
                             key={song.id}
-                            className="p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 flex items-center justify-between gap-3 hover:border-zinc-700 transition-colors"
+                            className="p-4 sm:p-5 rounded-2xl bg-[#040c19] border-2 border-zinc-800/90 hover:border-cyan-400/60 hover:bg-[#061226] flex items-center justify-between gap-3.5 transition-all shadow-sm"
                           >
                             <div className="min-w-0 flex-1">
-                              <strong className="text-white text-sm font-bold block truncate">{song.title}</strong>
-                              <span className="text-zinc-400 text-xs block truncate mt-0.5">{song.artist}</span>
+                              <h4 className="text-white text-base font-black block truncate leading-tight">{song.title}</h4>
+                              <p className="text-cyan-400 text-xs sm:text-sm font-bold block truncate mt-0.5">{song.artist}</p>
                               {song.key_signature && (
-                                <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
-                                  Tom: {song.key_signature}
+                                <span className="inline-block mt-2 text-[11px] font-bold text-amber-300 font-mono">
+                                  Tom Original: {song.key_signature}
                                 </span>
                               )}
                             </div>
@@ -716,7 +716,7 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                                       onShowToast(`"${song.title}" removida do setlist.`);
                                     }
                                   }}
-                                  className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-all cursor-pointer"
+                                  className="px-4 py-2.5 rounded-xl bg-emerald-950/80 border-2 border-emerald-500/60 text-emerald-300 text-xs font-black transition-all cursor-pointer shadow-sm"
                                   title="Música adicionada. Clique para remover do setlist se desejar."
                                 >
                                   ✓ No Setlist
@@ -728,10 +728,10 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                                     await onAddSongToSetlist(activeSetlist.id, song);
                                     onShowToast(`"${song.title}" adicionada separadamente ao setlist!`);
                                   }}
-                                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20"
+                                  className="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 active:scale-95 text-white text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-emerald-500/25 uppercase tracking-wide"
                                 >
-                                  <Plus size={14} />
-                                  <span>Adicionar</span>
+                                  <Plus size={16} className="stroke-[3]" />
+                                  <span>+ Adicionar</span>
                                 </button>
                               )}
 
@@ -741,10 +741,10 @@ export const AddSongToSetlistModal: React.FC<AddSongToSetlistModalProps> = ({
                                   onClick={() => {
                                     onDeleteSongFromLibrary(song.id);
                                   }}
-                                  className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                                  className="p-2.5 rounded-xl text-zinc-400 hover:text-rose-400 bg-zinc-900 hover:bg-rose-950/40 border border-zinc-800 hover:border-rose-500/40 transition-colors cursor-pointer"
                                   title="Excluir música da biblioteca"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
                               )}
                             </div>

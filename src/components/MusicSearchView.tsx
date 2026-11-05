@@ -225,88 +225,115 @@ export const MusicSearchView: React.FC<MusicSearchViewProps> = ({
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">
-      {/* SEARCH BAR */}
-      <div className="relative">
-        <form
-          onSubmit={handleSearchSubmit}
-          className="w-full bg-[#020b16] border border-[#0e3a63] hover:border-[#1670b8] focus-within:border-[#078fff] focus-within:shadow-[0_0_20px_rgba(7,143,255,0.25)] rounded-full px-4 py-2.5 flex items-center justify-between transition-all"
-        >
-          <div className="flex items-center flex-1 min-w-0 mr-3">
-            <Search className="w-5 h-5 text-[#427ca8] shrink-0 ml-2" />
-            <input
-              id="kolvox-search-input"
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Pesquisar por nome de música ou artista..."
-              className="w-full bg-transparent text-white placeholder-[#506782] text-base px-3 py-1 outline-none font-sans"
-            />
-          </div>
+      {/* HERO SEARCH BAR - BEM DESTACADA COM BRILHO CIANO */}
+      <div className="p-1 sm:p-1.5 rounded-3xl bg-gradient-to-r from-cyan-500/50 via-blue-600/40 to-indigo-500/50 shadow-[0_0_35px_rgba(6,182,212,0.25)]">
+        <div className="bg-[#040916] rounded-[22px] p-3.5 sm:p-5 space-y-4">
+          <form onSubmit={handleSearchSubmit} className="space-y-3">
+            <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-[#02050e] border-2 border-cyan-500/40 focus-within:border-cyan-400 focus-within:shadow-[0_0_30px_rgba(6,182,212,0.35)] rounded-2xl p-2 transition-all">
+              <div className="flex items-center flex-1 min-w-0 px-2">
+                <Search className="w-6 h-6 text-cyan-400 shrink-0 ml-1" />
+                <input
+                  id="kolvox-search-input"
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Pesquisar por nome de música, banda ou artista..."
+                  className="w-full pl-3 pr-2 py-2.5 bg-transparent text-base sm:text-lg text-white placeholder-zinc-400 font-semibold outline-none"
+                  autoFocus
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery('');
+                      setResults([]);
+                      setHasSearched(false);
+                    }}
+                    className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer mr-1"
+                    title="Limpar campo"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
 
-          <button
-            id="kolvox-search-submit-btn"
-            type="submit"
-            disabled={loading}
-            className="w-10 h-10 rounded-xl bg-gradient-to-r from-[#078fff] to-[#633cff] hover:opacity-90 active:scale-95 text-white flex items-center justify-center transition-all shadow-md shrink-0 cursor-pointer"
-            title="Buscar"
-          >
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Search className="w-5 h-5" />
-            )}
-          </button>
-        </form>
-      </div>
+              <button
+                id="kolvox-search-submit-btn"
+                type="submit"
+                disabled={loading || !query.trim()}
+                className="px-7 py-3 rounded-xl bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-600 hover:brightness-110 active:scale-95 disabled:opacity-40 text-white font-black text-sm uppercase tracking-wider shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2 cursor-pointer transition-all shrink-0"
+                title="Buscar no acervo"
+              >
+                {loading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4 stroke-[3]" />
+                )}
+                <span>Buscar Música</span>
+              </button>
+            </div>
 
-      {/* FILTER TABS (Todas, Músicas, Artistas, Álbuns) */}
-      <div className="flex items-center justify-center sm:justify-start gap-2 sm:gap-3 pt-1 flex-wrap">
-        {(['Todas', 'Músicas', 'Artistas', 'Álbuns'] as const).map((tab) => {
-          const isActive = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              onClick={() => handleTabChange(tab)}
-              className={`px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-gradient-to-r from-[#078fff] to-[#633cff] text-white shadow-[0_0_15px_rgba(7,143,255,0.4)]'
-                  : 'text-[#8393a9] hover:text-white hover:bg-[#061424]/60'
-              }`}
-            >
-              {tab}
-            </button>
-          );
-        })}
+            {/* FILTER TABS & QUICK SHORTCUTS */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+              {/* Category Segmented Controls */}
+              <div className="flex items-center gap-1 bg-[#02050e] p-1 rounded-xl border border-zinc-800">
+                {(['Todas', 'Músicas', 'Artistas', 'Álbuns'] as const).map((tab) => {
+                  const isActive = activeTab === tab;
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => handleTabChange(tab)}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-cyan-500 text-zinc-950 shadow-md font-black'
+                          : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  );
+                })}
+              </div>
 
-        <button
-          onClick={() => setShowManualModal(true)}
-          className="sm:ml-auto w-full sm:w-auto justify-center text-xs text-[#00c8ff] hover:text-[#7ce7ff] flex items-center gap-1.5 transition-colors font-medium cursor-pointer py-1"
-        >
-          <PlusCircle className="w-3.5 h-3.5" />
-          <span>Inserir letra manual</span>
-        </button>
+              <button
+                type="button"
+                onClick={() => setShowManualModal(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-cyan-950 border border-zinc-800 hover:border-cyan-400 text-xs font-bold text-cyan-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer shadow-sm self-start sm:self-auto"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>+ Inserir Letra Manual</span>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
 
       {/* SEARCH RESULTS LIST */}
-      <section id="results" className="flex flex-col gap-3">
+      <section id="results" className="flex flex-col gap-3.5">
         {!hasSearched ? (
-          <div className="py-20 text-center text-[#8393a9] bg-[#020b16]/60 border border-[#0e3a63]/40 rounded-2xl p-8">
-            <Search className="w-12 h-12 text-[#08a8ff]/60 mx-auto mb-3" />
-            <h3 className="text-white font-bold text-lg mb-1">Pesquise músicas ou artistas</h3>
-            <p className="text-sm text-[#8393a9] max-w-md mx-auto">
-              Digite o nome de uma música ou artista acima e clique em buscar. Apenas músicas originais e verificadas serão exibidas.
+          <div className="py-16 text-center text-zinc-400 bg-[#040a16] border-2 border-zinc-800/80 rounded-3xl p-8 sm:p-12 shadow-sm">
+            <div className="w-16 h-16 rounded-3xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mx-auto mb-4 shadow-lg shadow-cyan-500/10">
+              <Search className="w-8 h-8" />
+            </div>
+            <h3 className="text-white font-black text-xl mb-1.5">Catálogo Global de Músicas</h3>
+            <p className="text-sm text-zinc-300 max-w-md mx-auto leading-relaxed">
+              Digite acima o nome de uma música, banda ou artista para carregar letras originais completas e sincronizadas para o Modo Show.
             </p>
           </div>
         ) : results.length === 0 ? (
-          <div className="py-20 text-center text-[#8393a9] bg-[#020b16]/60 border border-[#0e3a63]/40 rounded-2xl p-8">
-            <Music className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-            <h3 className="text-white font-bold text-lg mb-1">Nenhuma música encontrada</h3>
-            <p className="text-sm text-[#8393a9] max-w-md mx-auto mb-4">
+          <div className="py-16 text-center text-zinc-400 bg-[#040a16] border-2 border-zinc-800/80 rounded-3xl p-8 sm:p-12 shadow-sm">
+            <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mx-auto mb-4 text-2xl">
+              <Music className="w-8 h-8" />
+            </div>
+            <h3 className="text-white font-black text-xl mb-1.5">Nenhuma música encontrada</h3>
+            <p className="text-sm text-zinc-300 max-w-md mx-auto mb-5 leading-relaxed">
               Não encontramos resultados para &ldquo;{query}&rdquo; no filtro de {activeTab}.
             </p>
             <button
+              type="button"
               onClick={() => setShowManualModal(true)}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#078fff] to-[#633cff] text-white text-xs font-bold shadow-md cursor-pointer inline-flex items-center gap-2 mx-auto"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white text-xs font-black uppercase tracking-wider shadow-md cursor-pointer inline-flex items-center gap-2 mx-auto"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Inserir Letra Manualmente</span>
@@ -318,23 +345,23 @@ export const MusicSearchView: React.FC<MusicSearchViewProps> = ({
             return (
               <article
                 key={item.id}
-                className="bg-gradient-to-r from-[#071626]/90 to-[#030b15]/95 border border-[#0b5a9d] hover:border-[#1689e8] rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 transition-all shadow-[0_0_18px_rgba(0,140,255,0.08)] group"
+                className="bg-[#040c19] border-2 border-zinc-800/90 hover:border-cyan-400/60 hover:bg-[#061226] hover:shadow-[0_0_25px_rgba(6,182,212,0.18)] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 transition-all group shadow-sm"
               >
                 {/* TOP / MAIN INFO ROW */}
-                <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0 w-full">
+                <div className="flex items-center gap-3.5 flex-1 min-w-0 w-full">
                   {/* DELETE BUTTON IN FRONT */}
                   <button
                     type="button"
                     onClick={() => handleDeleteMusicRow(item.id)}
                     title="Excluir música desta lista"
-                    className="delete-front-btn p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-red-950/40 hover:bg-red-600/90 border border-red-500/30 hover:border-red-400 text-red-300 hover:text-white text-xs font-semibold flex items-center gap-1 transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
+                    className="delete-front-btn p-2 sm:px-3 sm:py-2 rounded-xl bg-rose-950/40 hover:bg-rose-600/90 border border-rose-500/40 hover:border-rose-400 text-rose-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Excluir</span>
                   </button>
 
                   {/* ALBUM ART THUMBNAIL */}
-                  <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl overflow-hidden bg-[#0a1f33] shrink-0 border border-white/10 shadow-md flex items-center justify-center relative">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-zinc-900 shrink-0 border-2 border-zinc-700/80 group-hover:border-cyan-400 shadow-md flex items-center justify-center relative transition-all">
                     {item.cover ? (
                       <img
                         src={item.cover}
@@ -345,52 +372,60 @@ export const MusicSearchView: React.FC<MusicSearchViewProps> = ({
                         }}
                       />
                     ) : (
-                      <Music className="w-5 h-5 sm:w-6 sm:h-6 text-[#08a8ff]" />
+                      <Music className="w-6 h-6 text-cyan-400" />
                     )}
                   </div>
 
                   {/* SONG TITLE & ARTIST */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-white font-bold text-sm sm:text-lg leading-tight truncate">
-                        {item.title}
-                      </h4>
-                      {item.hasLicensedLyrics && (
-                        <span className="hidden lg:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          Letra Original
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[#8393a9] text-xs sm:text-sm font-medium truncate mt-0.5">
+                    <h4 className="text-white font-black text-base sm:text-lg leading-tight truncate group-hover:text-cyan-300 transition-colors">
+                      {item.title}
+                    </h4>
+                    <p className="text-cyan-400 text-xs sm:text-sm font-bold truncate mt-0.5">
                       {item.artist}
                     </p>
+
+                    {/* Clean unboxed metadata with dot separators */}
+                    <div className="flex items-center gap-2 text-xs text-zinc-400 mt-2 font-medium">
+                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>Letra Original LRC</span>
+                      </span>
+                      <span aria-hidden="true" className="text-zinc-600">·</span>
+                      <span className="text-zinc-400 truncate max-w-[140px]">
+                        {item.album || 'Estúdio'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* ACTIONS ROW */}
-                <div className="flex items-center justify-end sm:justify-start gap-2 shrink-0 w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 border-zinc-800/60">
+                {/* ACTIONS ROW - BOTÕES DESTACADOS */}
+                <div className="flex items-center justify-end sm:justify-start gap-2.5 shrink-0 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-800/80">
                   <button
                     type="button"
                     onClick={() => handleOpenLyricsPreview(item)}
-                    className="flex-1 sm:flex-initial justify-center px-3 py-1.5 rounded-xl border border-[#0b73c9]/60 bg-[#051628]/90 text-[#7cbfff] hover:text-white hover:border-[#00c8ff] text-xs font-medium shadow-inner flex items-center gap-1.5 cursor-pointer transition-all"
-                    title="Ver letra original completa"
+                    className="flex-1 sm:flex-initial justify-center px-3.5 py-2.5 rounded-xl border border-cyan-500/50 hover:border-cyan-400 bg-[#07162b] hover:bg-cyan-950 text-cyan-300 hover:text-white text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                    title="Ver letra original completa e cifra"
                   >
-                    <Eye className="w-3.5 h-3.5 text-[#00c8ff]" />
+                    <Eye className="w-3.5 h-3.5 text-cyan-400" />
                     <span>Letra + Cifra</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleApplySong(item)}
-                    className="flex-1 sm:flex-initial justify-center px-4 sm:px-6 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-[#078fff] to-[#633cff] hover:opacity-90 active:scale-95 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-[#078fff]/25 flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="flex-1 sm:flex-initial justify-center px-5 sm:px-7 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:brightness-110 active:scale-95 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-500/25 uppercase tracking-wide flex items-center gap-2 transition-all cursor-pointer"
                   >
                     {isApplied ? (
                       <>
-                        <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <Check className="w-4 h-4 stroke-[3]" />
                         <span>Aplicado!</span>
                       </>
                     ) : (
-                      <span>Aplicar</span>
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>Aplicar no Show</span>
+                      </>
                     )}
                   </button>
                 </div>
